@@ -59,3 +59,9 @@ Demo
 3. Drag and drop zip file to install
 
 ## Building
+```bash
+# Install dependencies
+yarn install
+
+# Build extension
+yarn build
