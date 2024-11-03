@@ -1,34 +1,42 @@
 {
   "name": "TMSCaptcha",
   "description": "Extension to autofill captcha on Nepse TMS",
-  "version": "0.3.1",
-  "author": "Daze <dazehere@yandex.com>",
+  "version": "0.4.5",
+  "author": "Suraj Rimal <davidparkedme@gmail.com>",
   "manifest_version": 3,
-  "background": {
-    "service_worker": "background.ts",
-    "type": "module"
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "permissions": ["storage"],
+  "action": {
+    "default_icon": {
+      "16": "images/icon16.png",
+      "32": "images/icon32.png",
+      "48": "images/icon48.png",
+      "128": "images/icon128.png"
+    },
+    "default_title": "Generate a summary",
+    "default_popup": "popup/popup.html"
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://*.nepsetms.com.np/login"
-      ],
+      "matches": ["https://*.nepsetms.com.np/login"],
       "js": [
         "content-script.ts",
         "evaluate.ts",
         "data/bold_data.json",
         "data/slim_data.json"
       ]
+    },
+    {
+      "matches": ["*://meroshare.cdsc.com.np/*"],
+      "js": ["content-script-meroshare.ts"]
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": [
-        "assets/empty.jpg"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
+      "resources": ["assets/empty.jpg"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

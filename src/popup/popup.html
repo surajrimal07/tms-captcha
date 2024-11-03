@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Accounts</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Main accounts section -->
+        <div id="accountsSection" class="accounts-section">
+            <div class="header">
+                <h1>Manage Accounts</h1>
+                <button id="addAccountBtn" class="btn-add" title="Add new account">
+                    Add Account
+                </button>
+            </div>
+            <div class="tabs">
+                <button class="tab-button active" data-tab="tms">TMS Account</button>
+                <button class="tab-button" data-tab="meroshare">Meroshare Account</button>
+            </div>
+            <div id="tmsContent" class="tab-content">
+                <div id="accountsList" class="accounts-list"></div>
+            </div>
+            <div id="meroshareContent" class="tab-content hidden">
+                <div id="meroshareAccountsList" class="accounts-list"></div>
+            </div>
+        </div>
+
+        <div id="addAccountSection" class="add-account-form hidden">
+            <div class="form-header">
+                <h2 id="formTitle">Add New Account</h2>
+                <button id="closeFormBtn" class="btn-close" title="Close form">&times;</button>
+            </div>
+
+            <form id="accountForm">
+                <div class="form-group">
+                    <label for="alias">Broker/ DP Number</label>
+                    <input type="number" id="broker" name="broker" required>
+                </div>
+                <div class="form-group">
+                    <label for="alias">Account Alias</label>
+                    <input type="text" id="alias" name="alias" required>
+                </div>
+
+                <div class="form-group radio-group">
+                    <label>Account Type</label>
+                    <div class="radio-options">
+                        <div class="radio-option">
+                            <input type="radio" id="typeTMS" name="accountType" value="tms" checked>
+                            <label for="typeTMS">TMS</label>
+                        </div>
+                        <div class="radio-option">
+                            <input type="radio" id="typeMeroshare" name="accountType" value="meroshare">
+                            <label for="typeMeroshare">Meroshare</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <div class="form-group checkbox">
+                    <input type="checkbox" id="isPrimary" name="isPrimary">
+                    <label for="isPrimary">Set as Primary Account</label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Add Account</button>
+                    <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="notification" class="notification hidden"></div>
+    </div>
+    <script src="popup.ts" type="module"></script>
+</body>
+
+</html>

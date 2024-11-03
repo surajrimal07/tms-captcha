@@ -1,8 +1,8 @@
 {
   "name": "tms-captcha",
-  "version": "0.3.1",
-  "repository": "git@github.com:arpandaze/tms-captcha.git",
-  "author": "Daze <dazehere@yandex.com>",
+  "version": "0.4.5",
+  "repository": "git@github.com/surajrimal07/tms-captcha.git",
+  "author": "Suraj Rimal <davidparkedme@gmail.com>",
   "license": "MIT",
   "devDependencies": {
     "@parcel/config-webextension": "^2.8.2",
@@ -13,7 +13,6 @@
     "parcel": "^2.8.2"
   },
   "dependencies": {
-    "crx-hotreload": "^1.0.6",
     "image-js": "^0.35.2"
   },
   "scripts": {
