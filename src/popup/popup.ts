@@ -63,6 +63,8 @@ function setupBackupRestore() {
   const backupBtn = document.getElementById("backupBtn");
   const restoreBtn = document.getElementById("restoreBtn");
   const analyticsBtn = document.getElementById("analyticsBtn");
+  const privacyBtn = document.getElementById("privacyBtn");
+  const termsBtn = document.getElementById("termsBtn");
 
   menuBtn?.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -85,6 +87,20 @@ function setupBackupRestore() {
 
   analyticsBtn?.addEventListener("click", () => {
     toggleAnalytics();
+    menuContent?.classList.add("hidden");
+  });
+
+  privacyBtn?.addEventListener("click", () => {
+    chrome.tabs.create({
+      url: "https://www.surajrimal.dev/tmsextension/privacy",
+    });
+    menuContent?.classList.add("hidden");
+  });
+
+  termsBtn?.addEventListener("click", () => {
+    chrome.tabs.create({
+      url: "https://www.surajrimal.dev/tmsextension/terms",
+    });
     menuContent?.classList.add("hidden");
   });
 }
@@ -110,6 +126,8 @@ function addMenuToHeader() {
         <button id="analyticsBtn">
           ${state.isAnalyticsEnabled ? "Disable" : "Enable"} Analytics
         </button>
+         <button id="privacyBtn">Privacy Policy</button>
+        <button id="termsBtn">Terms of Service</button>
       </div>
     </div>
   `;
