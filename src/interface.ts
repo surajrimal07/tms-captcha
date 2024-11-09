@@ -68,6 +68,6 @@ export const CONFIG: Readonly<Config> = {
 
 export const MEROSHAREDASHBOARD_PATTERN = /\/#\/dashboard$/;
 export const ANALYTICS_ENDPOINT =
-  "https://surajr.com.np/api/logincount?action=receive" as const;
+  "https://surajrimal.dev/api/logincount?action=receive" as const;
 export const MEROSHARE_LOGIN_URL = "meroshare.cdsc.com.np/#/login" as const;
 export const TMS_DASHBOARD_PATTERN = /\/tms\/client\/dashboard/;

@@ -1,7 +1,7 @@
 {
-  "name": "Nepse Trade Helper",
+  "name": "Nepse Account Manager",
   "description": "Extension to auto fill Nepse TMS and Meroshare login forms",
-  "version": "0.4.7",
+  "version": "0.5.1",
   "author": "Suraj Rimal <davidparkedme@gmail.com>",
   "manifest_version": 3,
   "content_security_policy": {

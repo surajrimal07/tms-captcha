@@ -1,6 +1,6 @@
 {
-  "name": "tms-captcha",
-  "version": "0.4.5",
+  "name": "nepse-login-helper",
+  "version": "0.5.1",
   "repository": "git@github.com/surajrimal07/tms-captcha.git",
   "author": "Suraj Rimal <davidparkedme@gmail.com>",
   "license": "MIT",
