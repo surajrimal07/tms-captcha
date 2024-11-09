@@ -1,15 +1,11 @@
 <h1 align="center">
 TMS and Meroshare Helper
 </h1>
-<p align="center"> Extension for chromium based browsers to solve and autofill captchas on NEPSE TMS sites. </p>
+<p align="center"> Extension for chromium based browsers to solve, autofill captchas and autologin on TMS and Meroshare sites. </p>
 <h2 align="center">
 Demo
 </h2>
 <p align="center"><img src="https://user-images.githubusercontent.com/46302068/215273678-4ba5f4fc-01b5-4ab6-bad9-429388e4d366.gif" width="400"/></p>
-
-# TMS Captcha Solver
-
-> Browser extension to solve captchas and auto-fill credentials for NEPSE TMS and Meroshare sites.
 
 ## Features
 
@@ -59,3 +55,9 @@ Demo
 3. Drag and drop zip file to install
 
 ## Building
+```bash
+# Install dependencies
+yarn install
+
+# Build extension
+yarn build
