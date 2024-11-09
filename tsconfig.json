@@ -5,12 +5,17 @@
     "target": "es6",
     "esModuleInterop": true,
     "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
     "sourceMap": true,
-    "rootDir": "src",
+    "rootDir": "./",
     "outDir": "dist/js",
     "noEmitOnError": true,
     "typeRoots": [
       "node_modules/@types"
-    ]
-  }
+    ],
+  },
+  "include": [
+    "src/**/*",
+    "scripts/**/*"
+  ]
 }

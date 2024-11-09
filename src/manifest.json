@@ -1,13 +1,19 @@
 {
-  "name": "TMSCaptcha",
-  "description": "Extension to autofill captcha on Nepse TMS",
-  "version": "0.4.5",
+  "name": "Nepse Trade Helper",
+  "description": "Extension to auto fill Nepse TMS and Meroshare login forms",
+  "version": "0.4.7",
   "author": "Suraj Rimal <davidparkedme@gmail.com>",
   "manifest_version": 3,
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "permissions": ["storage"],
+  "icons": {
+    "16": "images/icon16.png",
+    "32": "images/icon32.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  },
   "action": {
     "default_icon": {
       "16": "images/icon16.png",

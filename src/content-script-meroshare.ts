@@ -11,9 +11,16 @@ import {
 } from "./interface";
 
 class FormHandler {
-  private retryCount = 0;
+  private static readonly TIMEOUT = 500;
+  private static readonly EVENT_TYPES = {
+    INPUT: ["input", "change", "blur"] as const,
+    SELECT: ["change", "select2:select"] as const,
+  } as const;
+  private static readonly ANIMATION_FRAME_DELAY = 500;
+
   private form: HTMLFormElement | null = null;
   private readonly abortController: AbortController;
+  private readonly signals: { [key: string]: AbortController } = {};
 
   constructor() {
     this.abortController = new AbortController();
@@ -35,61 +42,71 @@ class FormHandler {
 
   public cleanup(): void {
     this.abortController.abort();
+    Object.values(this.signals).forEach((controller) => controller.abort());
   }
 
   private async waitForForm(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const checkForm = (): void => {
-        this.form = document.querySelector<HTMLFormElement>(
-          CONFIG.SELECTORS.FORM
-        );
-
-        if (this.form) {
-          resolve();
-        } else if (this.retryCount++ < CONFIG.MAX_RETRIES) {
-          setTimeout(checkForm, CONFIG.RETRY_DELAY);
-        } else {
-          reject(new Error("Form not found after maximum retries"));
-        }
-      };
-      checkForm();
-    });
+    const form = await this.waitForElement(CONFIG.SELECTORS.FORM);
+    if (!form) {
+      throw new Error("Form not found");
+    }
+    this.form = form as HTMLFormElement;
   }
 
   private async fillCredentials(): Promise<void> {
     const credentials = await this.getStoredCredentials();
     if (!credentials) return;
 
-    await this.delay(CONFIG.INITIAL_DELAY);
-    await this.fillDP(credentials.dp);
-    await this.delay(300);
+    const signal = this.createSignal("credentials");
 
-    await Promise.all([
-      this.fillInput(CONFIG.SELECTORS.USERNAME, credentials.username),
-      this.fillInput(CONFIG.SELECTORS.PASSWORD, credentials.password),
-    ]);
+    try {
+      // Batch DOM operations
+      const updates = [
+        this.fillDP(credentials.dp),
+        this.fillInput(CONFIG.SELECTORS.USERNAME, credentials.username),
+        this.fillInput(CONFIG.SELECTORS.PASSWORD, credentials.password),
+      ];
 
-    this.delay(500).then(() => this.submitForm());
+      await Promise.all(updates);
+
+      if (!signal.signal.aborted) {
+        requestAnimationFrame(() => {
+          setTimeout(
+            () => this.submitForm(),
+            FormHandler.ANIMATION_FRAME_DELAY
+          );
+        });
+      }
+    } finally {
+      this.removeSignal("credentials");
+    }
+  }
+
+  private createSignal(key: string): AbortController {
+    const controller = new AbortController();
+    this.signals[key] = controller;
+    return controller;
+  }
+
+  private removeSignal(key: string): void {
+    delete this.signals[key];
   }
 
   private async getStoredCredentials(): Promise<Credentials | null> {
     try {
       const { accounts = [] } = await chrome.storage.local.get("accounts");
-      const meroshareAccounts = accounts.filter(
-        (acc: Account) => acc.type === "meroshare"
-      );
-
-      if (!meroshareAccounts.length) return null;
-
       const selectedAccount =
-        meroshareAccounts.find((acc: Account) => acc.isPrimary) ||
-        meroshareAccounts[0];
+        accounts.find(
+          (acc: Account) => acc.type === "meroshare" && acc.isPrimary
+        ) || accounts.find((acc: Account) => acc.type === "meroshare");
 
-      return {
-        dp: selectedAccount.broker.toString(),
-        username: selectedAccount.username,
-        password: selectedAccount.password,
-      };
+      return selectedAccount
+        ? {
+            dp: selectedAccount.broker.toString(),
+            username: selectedAccount.username,
+            password: selectedAccount.password,
+          }
+        : null;
     } catch (error) {
       console.error("Error getting stored credentials:", error);
       return null;
@@ -97,38 +114,27 @@ class FormHandler {
   }
 
   private async fillDP(dpValue: string): Promise<void> {
-    const select2Element = await this.waitForElement(
-      'select2[name="selectBranch"]'
+    const [select2Element, nativeSelect, select2Container] = await Promise.all([
+      this.waitForElement('select2[name="selectBranch"]'),
+      this.waitForElement(
+        ".select2-hidden-accessible"
+      ) as Promise<HTMLSelectElement | null>,
+      this.waitForElement(".select2-container"),
+    ]);
+
+    if (!select2Element || !nativeSelect || !select2Container) return;
+
+    const targetOption = Array.from(nativeSelect.options).find((opt) =>
+      opt.text.includes(dpValue)
     );
-    if (!select2Element) return;
+    if (!targetOption) return;
 
-    const select2Container =
-      document.querySelector<HTMLElement>(".select2-container");
-    const nativeSelect = document.querySelector<HTMLSelectElement>(
-      ".select2-hidden-accessible"
+    await this.updateSelect2Value(
+      nativeSelect,
+      targetOption,
+      select2Container as HTMLElement,
+      select2Element
     );
-
-    if (!select2Container || !nativeSelect) return;
-
-    try {
-      const targetOption = Array.from(nativeSelect.options).find((opt) =>
-        opt.text.includes(dpValue)
-      );
-
-      if (!targetOption) {
-        console.warn("Target option not found:", dpValue);
-        return;
-      }
-
-      await this.updateSelect2Value(
-        nativeSelect,
-        targetOption,
-        select2Container,
-        select2Element
-      );
-    } catch (error) {
-      console.error("Error setting Select2 value:", error);
-    }
   }
 
   private async updateSelect2Value(
@@ -157,13 +163,15 @@ class FormHandler {
       }
     }
 
-    this.dispatchSelectEvents(nativeSelect);
+    this.dispatchEvents(nativeSelect, FormHandler.EVENT_TYPES.SELECT);
     await this.updateAngularComponent(select2Element, targetOption.value);
-    await this.delay(100);
   }
 
-  private dispatchSelectEvents(element: HTMLElement): void {
-    ["change", "select2:select"].forEach((eventType) => {
+  private dispatchEvents(
+    element: HTMLElement,
+    eventTypes: readonly string[]
+  ): void {
+    eventTypes.forEach((eventType) => {
       element.dispatchEvent(new Event(eventType, { bubbles: true }));
     });
   }
@@ -189,71 +197,84 @@ class FormHandler {
 
     input.value = value;
     await this.updateAngularComponent(input, value);
-
-    ["input", "change", "blur"].forEach((eventType) => {
-      input.dispatchEvent(new Event(eventType, { bubbles: true }));
-    });
-
-    await this.delay(100);
+    this.dispatchEvents(input, FormHandler.EVENT_TYPES.INPUT);
   }
 
   private async submitForm(): Promise<void> {
     const button = document.querySelector<HTMLButtonElement>(
       CONFIG.SELECTORS.LOGIN_BUTTON
     );
-    if (button && !button.disabled) {
+    if (button?.disabled === false) {
       button.click();
       await this.handlePostSubmit();
     }
   }
 
   private async handlePostSubmit(): Promise<void> {
-    await this.delay(1000);
-    const [{ analyticsEnabled }, newUrl] = await Promise.all([
-      chrome.storage.local.get("analyticsEnabled"),
-      Promise.resolve(window.location.href),
-    ]);
+    const signal = this.createSignal("postSubmit");
 
-    if (MEROSHAREDASHBOARD_PATTERN.test(newUrl) && analyticsEnabled !== false) {
-      try {
-        await fetch(ANALYTICS_ENDPOINT, { mode: "no-cors" });
-      } catch {
-        // Silently fail
+    try {
+      const [{ analyticsEnabled }, newUrl] = await Promise.all([
+        chrome.storage.local.get("analyticsEnabled"),
+        Promise.resolve(window.location.href),
+      ]);
+
+      if (
+        !signal.signal.aborted &&
+        MEROSHAREDASHBOARD_PATTERN.test(newUrl) &&
+        analyticsEnabled !== false
+      ) {
+        fetch(ANALYTICS_ENDPOINT, { mode: "no-cors" }).catch(() => {});
       }
+    } finally {
+      this.removeSignal("postSubmit");
     }
-  }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-      const timeoutId = setTimeout(resolve, ms);
-      this.abortController.signal.addEventListener("abort", () => {
-        clearTimeout(timeoutId);
-        resolve();
-      });
-    });
   }
 
   private async waitForElement(
     selector: string,
-    timeout = 500
+    timeout = FormHandler.TIMEOUT
   ): Promise<Element | null> {
-    const startTime = Date.now();
+    const element = document.querySelector(selector);
+    if (element) return element;
 
-    while (Date.now() - startTime < timeout) {
-      const element = document.querySelector(selector);
-      if (element) return element;
-      await this.delay(100);
-    }
+    return new Promise((resolve) => {
+      const observer = new MutationObserver((_, observer) => {
+        const element = document.querySelector(selector);
+        if (element) {
+          observer.disconnect();
+          resolve(element);
+        }
+      });
 
-    return null;
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+
+      setTimeout(() => {
+        observer.disconnect();
+        resolve(null);
+      }, timeout);
+    });
   }
 }
 
 class MeroShareHandler {
+  private static instance: MeroShareHandler;
   private currentFormHandler: FormHandler | null = null;
   private initialized = false;
+  private readonly observer: MutationObserver;
 
-  constructor() {
+  public static getInstance(): MeroShareHandler {
+    if (!MeroShareHandler.instance) {
+      MeroShareHandler.instance = new MeroShareHandler();
+    }
+    return MeroShareHandler.instance;
+  }
+
+  private constructor() {
+    this.observer = new MutationObserver(this.handleDOMChanges.bind(this));
     this.setupUrlChangeDetection();
     this.setupMutationObserver();
   }
@@ -276,16 +297,16 @@ class MeroShareHandler {
   }
 
   private setupMutationObserver(): void {
-    const observer = new MutationObserver(() => {
-      if (this.shouldInitialize()) {
-        this.initialize();
-      }
-    });
-
-    observer.observe(document.body, {
+    this.observer.observe(document.body, {
       childList: true,
       subtree: true,
     });
+  }
+
+  private handleDOMChanges(): void {
+    if (this.shouldInitialize()) {
+      this.initialize();
+    }
   }
 
   private shouldInitialize(): boolean {
@@ -322,7 +343,8 @@ class MeroShareHandler {
   }
 }
 
-const meroShareHandler = new MeroShareHandler();
+// Initialize only once when the script loads
+const meroShareHandler = MeroShareHandler.getInstance();
 if (window.location.href.includes(MEROSHARE_LOGIN_URL)) {
   meroShareHandler.initialize();
 }

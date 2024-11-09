@@ -8,6 +8,7 @@ import {
 } from "./interface";
 
 const RELOAD_LIMIT = 3;
+const DELAY_MS = 2000;
 
 let reload_counter = 0;
 
@@ -19,32 +20,49 @@ async function reload_captcha() {
     ?.dispatchEvent(new Event("click"));
 }
 
-async function getMatchingAccount(url: string): Promise<Account | null> {
-  try {
+// Memoize account lookup to prevent repeated storage calls
+const getMatchingAccount = (() => {
+  let cachedAccount: Account | null = null;
+  let cachedBrokerNumber: string | null = null;
+
+  return async (url: string): Promise<Account | null> => {
     const brokerMatch = url.match(
       /https:\/\/tms(\d+)\.nepsetms\.com\.np\/login/
     );
-
     if (!brokerMatch) return null;
 
     const brokerNumber = brokerMatch[1];
+    if (cachedAccount && cachedBrokerNumber === brokerNumber) {
+      return cachedAccount;
+    }
 
-    const result = await chrome.storage.local.get("accounts");
-    const accounts: Account[] = result.accounts || [];
+    try {
+      const { accounts = [] } = await chrome.storage.local.get("accounts");
+      const matchingAccounts = accounts.filter(
+        (acc: Account) =>
+          acc.type === "tms" &&
+          acc.broker?.toString().padStart(2, "0") === brokerNumber
+      );
+      cachedBrokerNumber = brokerNumber;
+      cachedAccount =
+        matchingAccounts.find((acc: Account) => acc.isPrimary) ||
+        matchingAccounts[0] ||
+        null;
+      return cachedAccount;
+    } catch {
+      return null;
+    }
+  };
+})();
 
-    const matchingAccounts = accounts.filter(
-      (acc) =>
-        acc.type === "tms" && // Filter TMS accounts only
-        acc.broker?.toString().padStart(2, "0") === brokerNumber
-    );
-
-    if (matchingAccounts.length === 0) return null;
-
-    return matchingAccounts.find((acc) => acc.isPrimary) || matchingAccounts[0];
-  } catch (error) {
-    return null;
+// Helper function for input field handling
+const setInputValue = (selector: string, value: string) => {
+  const field = document.querySelector(selector) as HTMLInputElement;
+  if (field) {
+    field.value = value;
+    field.dispatchEvent(new Event("input"));
   }
-}
+};
 
 async function handle_result(result: SolveResult) {
   switch (result.type) {
@@ -52,33 +70,21 @@ async function handle_result(result: SolveResult) {
       const currentUrl = window.location.href;
       const account = await getMatchingAccount(currentUrl);
 
-      if (!account) {
-        return;
-      }
+      if (!account) return;
 
-      const usernameField = document.querySelector(
-        'input[placeholder="Client Code/ User Name"]'
+      // Set form values
+      setInputValue(
+        'input[placeholder="Client Code/ User Name"]',
+        account.username
       );
-      if (usernameField) {
-        (usernameField as HTMLInputElement).value = account!.username;
-        usernameField.dispatchEvent(new Event("input"));
-      }
+      setInputValue('input[placeholder="Password"]', account.password);
 
-      const passwordField = document.querySelector(
-        'input[placeholder="Password"]'
-      );
-      if (passwordField) {
-        (passwordField as HTMLInputElement).value = account!.password;
-        passwordField.dispatchEvent(new Event("input"));
-      }
+      // Submit form
+      document
+        .querySelector('input[value="Login"]')
+        ?.dispatchEvent(new Event("click"));
 
-      const submitButton = document.querySelector('input[value="Login"]');
-
-      if (submitButton) {
-        submitButton.dispatchEvent(new Event("click"));
-      }
-
-      await delay(2000);
+      await delay(DELAY_MS);
 
       const [{ analyticsEnabled }, newUrl] = await Promise.all([
         chrome.storage.local.get("analyticsEnabled"),
@@ -86,13 +92,7 @@ async function handle_result(result: SolveResult) {
       ]);
 
       if (TMS_DASHBOARD_PATTERN.test(newUrl) && analyticsEnabled !== false) {
-        try {
-          await fetch(ANALYTICS_ENDPOINT, {
-            mode: "no-cors",
-          }).catch(() => {});
-        } catch {
-          // Silently fail
-        }
+        fetch(ANALYTICS_ENDPOINT, { mode: "no-cors" }).catch(() => {});
       }
       return;
     }
