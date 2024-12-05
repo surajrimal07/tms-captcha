@@ -1,6 +1,6 @@
 {
   "name": "nepse-login-helper",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "repository": "git@github.com/surajrimal07/tms-captcha.git",
   "author": "Suraj Rimal <davidparkedme@gmail.com>",
   "license": "MIT",
@@ -13,7 +13,8 @@
     "parcel": "^2.8.2"
   },
   "dependencies": {
-    "image-js": "^0.35.2"
+    "image-js": "^0.35.2",
+    "pusher-js": "^8.4.0-rc2"
   },
   "scripts": {
     "start": "parcel watch src/manifest.json --host localhost --config @parcel/config-webextension",

@@ -1,13 +1,18 @@
 {
   "name": "Nepse Account Manager",
-  "description": "Extension to auto fill Nepse TMS and Meroshare login forms",
-  "version": "0.5.1",
+  "description": "A browser extension to enhance user experience for Nepal Stock Exchange (NEPSE) TMS and Meroshare platforms. Helps users manage and auto-fill login credentials for Nepal's stock market platforms.",
+  "version": "0.5.2",
   "author": "Suraj Rimal <davidparkedme@gmail.com>",
   "manifest_version": 3,
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+    "extension_pages": "script-src 'self' "
   },
-  "permissions": ["storage"],
+  "permissions": ["storage", "background"],
+  "host_permissions": ["https://*.pusher.com/*", "wss://*.pusher.com/*"],
+  "background": {
+    "service_worker": "background.ts",
+    "type": "module"
+  },
   "icons": {
     "16": "images/icon16.png",
     "32": "images/icon32.png",
@@ -21,7 +26,7 @@
       "48": "images/icon48.png",
       "128": "images/icon128.png"
     },
-    "default_title": "Generate a summary",
+    "default_title": "Nepse Account Manager",
     "default_popup": "popup/popup.html"
   },
   "content_scripts": [

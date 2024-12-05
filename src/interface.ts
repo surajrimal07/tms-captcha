@@ -1,8 +1,71 @@
 export enum ResultTypes {
-  Success,
-  LowConfidence,
-  InvalidLength,
+  Success = 0,
+  LowConfidence = 1,
+  InvalidLength = 2,
 }
+
+export interface NepseOpenData {
+  data: string;
+  event: string;
+  channel: string;
+}
+
+export interface NepseOpenMessage {
+  message: boolean;
+}
+
+export interface NepseRawData {
+  message: {
+    time: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    change: number;
+    percentageChange: number;
+    turnover: number;
+    totalTradedShared: number;
+    totalTransactions: number;
+    totalScripsTraded: number;
+    isOpen: boolean;
+    fiftyTwoWeekHigh: number;
+    fiftyTwoWeekLow: number;
+    previousClose: number;
+  };
+  channel: string;
+  event: string;
+}
+
+export interface NepseData {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  change: number;
+  percentageChange: number;
+  turnover: number;
+  totalTradedShared: number;
+  totalTransactions: number;
+  totalScripsTraded: number;
+  isOpen: boolean;
+  fiftyTwoWeekHigh: number;
+  fiftyTwoWeekLow: number;
+  previousClose: number;
+}
+
+export type NepseDataSubset = Pick<
+  NepseData,
+  | "time"
+  | "open"
+  | "high"
+  | "low"
+  | "isOpen"
+  | "close"
+  | "change"
+  | "percentageChange"
+  | "turnover"
+>;
 
 export interface SolveResult {
   type: ResultTypes;

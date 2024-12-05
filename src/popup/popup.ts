@@ -1,11 +1,41 @@
-import { Account } from "../interface";
+import type { Account, NepseDataSubset } from "../interface";
+import { formatTurnover } from "../util";
+
+let port: chrome.runtime.Port;
+
+function connectToServiceWorker() {
+  port = chrome.runtime.connect({ name: "popup" });
+
+  port.onMessage.addListener((message) => {
+    if (message.type === "NEPSE_DATA_UPDATE") {
+      state.nepseData = message.payload;
+      updateNepseUI();
+    } else if (message.type === "NEPSE_STATUS_UPDATE") {
+      state.isOpen = message.payload;
+      updateNepseUI();
+    }
+  });
+}
 
 // State management
 const state = {
   accounts: [] as Account[],
   editingAccount: null as string | null,
   isAnalyticsEnabled: true,
-  activeTab: "tms" as "tms" | "meroshare",
+  activeTab: "nepse" as "nepse" | "tms" | "meroshare",
+  isNepseEnabled: true,
+  isOpen: false,
+  nepseData: {
+    time: "2024-12-04T14:59:59.977",
+    isOpen: false,
+    open: 2775.4,
+    high: 2795.7847,
+    low: 2747.6513,
+    close: 2750.87,
+    change: -24.97,
+    percentageChange: -0.89,
+    turnover: 9132468906.77,
+  } as NepseDataSubset,
 };
 
 // DOM Elements
@@ -21,18 +51,45 @@ const elements = {
   accountsSection: document.getElementById("accountsSection") as HTMLDivElement,
   notification: document.getElementById("notification") as HTMLDivElement,
   analyticsBtn: document.getElementById("analyticsBtn") as HTMLButtonElement,
+  nepseToggle: document.getElementById("nepseBtn") as HTMLButtonElement,
+  nepseTab: document.getElementById("nepseTab") as HTMLDivElement,
 };
 
 // Core initialization
 async function init() {
+  connectToServiceWorker();
   await loadAccounts();
   await loadAnalyticsState();
+  await loadNepseState();
+  const savedNepseData = await loadNepseData();
+  if (savedNepseData) {
+    state.nepseData = savedNepseData;
+    updateNepseUI();
+  }
   setupEventListeners();
   setupTabSwitching();
+  setupBackupRestore();
   renderAccountsList();
   elements.addAccountSection.classList.add("hidden");
   addMenuToHeader();
-  setupBackupRestore();
+
+  // Initialize correct content visibility based on Nepse state
+  const nepseContent = document.getElementById("nepseTab");
+  const tmsContent = document.getElementById("tmsContent");
+
+  if (!state.isNepseEnabled) {
+    if (nepseContent) nepseContent.style.display = "none";
+    if (tmsContent) tmsContent.style.display = "block";
+
+    // Ensure TMS tab is active
+    const nepseTab = document.querySelector('[data-tab="nepse"]');
+    const tmsTab = document.querySelector('[data-tab="tms"]');
+    nepseTab?.classList.remove("active");
+    tmsTab?.classList.add("active");
+    state.activeTab = "tms";
+  }
+
+  updateNepseToggleUI();
 }
 
 async function toggleAnalytics() {
@@ -57,6 +114,138 @@ async function toggleAnalytics() {
   }
 }
 
+function updateNepseUI() {
+  const { time, open, high, low, close, change, turnover } = state.nepseData;
+
+  const isPositive = change >= 0;
+
+  const elements = {
+    time: document.getElementById("nepseTime"),
+    open: document.getElementById("nepseOpen"),
+    high: document.getElementById("nepseHigh"),
+    low: document.getElementById("nepseLow"),
+    close: document.getElementById("nepseClose"),
+    change: document.getElementById("nepseChange"),
+    turnover: document.getElementById("nepseTurnover"),
+    statusText: document.querySelector(".status-text"),
+    statusIndicator: document.querySelector(".status-indicator"),
+  };
+
+  if (elements.statusText && elements.statusIndicator) {
+    elements.statusText.textContent = state.isOpen
+      ? "Market Open"
+      : "Market Closed";
+    elements.statusIndicator.classList.toggle("active", state.isOpen);
+    elements.statusText.classList.toggle("active", state.isOpen);
+  }
+
+  const indexDisplay = document.querySelector(".index-display");
+  if (indexDisplay) {
+    indexDisplay.classList.remove("positive", "negative");
+    indexDisplay.classList.add(isPositive ? "positive" : "negative");
+  }
+
+  // Update change indicator arrow
+  const changeIndicator = document.querySelector(".change-indicator");
+  if (changeIndicator) {
+    changeIndicator.classList.remove("positive", "negative");
+    changeIndicator.classList.add(isPositive ? "positive" : "negative");
+  }
+
+  if (elements.time) {
+    elements.time.textContent = new Date(time).toLocaleString();
+  }
+
+  if (elements.open) {
+    elements.open.textContent = open.toFixed(2);
+  }
+
+  if (elements.high) {
+    elements.high.textContent = high.toFixed(2);
+  }
+
+  if (elements.low) {
+    elements.low.textContent = low.toFixed(2);
+  }
+
+  if (elements.close) {
+    elements.close.textContent = close.toFixed(2);
+  }
+
+  if (elements.change) {
+    elements.change.textContent = change.toFixed(2);
+  }
+
+  if (elements.turnover) {
+    elements.turnover.textContent = formatTurnover(turnover);
+  }
+}
+
+function updateNepseToggleUI() {
+  const btn = elements.nepseToggle;
+  const nepseTab = document.querySelector('[data-tab="nepse"]');
+  const tmsTab = document.querySelector('[data-tab="tms"]');
+  const nepseContent = document.querySelector("#nepseTab");
+  const tmsContent = document.querySelector("#tmsContent");
+  const status = state.isNepseEnabled ? "enabled" : "disabled";
+
+  btn.textContent = state.isNepseEnabled
+    ? "Disable Nepse Live"
+    : "Enable Nepse Live";
+  btn.classList.toggle("active", state.isNepseEnabled);
+
+  if (nepseTab) {
+    (nepseTab as HTMLElement).style.display = state.isNepseEnabled
+      ? "block"
+      : "none";
+  }
+
+  if (!state.isNepseEnabled) {
+    if (nepseContent) {
+      (nepseContent as HTMLElement).style.display = "none";
+    }
+
+    if (nepseTab?.classList.contains("active")) {
+      nepseTab.classList.remove("active");
+      tmsTab?.classList.add("active");
+      if (tmsContent) {
+        (tmsContent as HTMLElement).style.display = "block";
+      }
+    }
+    state.activeTab = "tms";
+  }
+}
+
+async function loadNepseState() {
+  const result = await chrome.storage.local.get("isNepseEnabled");
+
+  state.isNepseEnabled = result.isNepseEnabled !== false;
+  updateNepseToggleUI();
+}
+
+async function loadNepseData(): Promise<NepseDataSubset | null> {
+  try {
+    const result = await chrome.storage.local.get("nepseData");
+    return result.nepseData || null;
+  } catch (error) {
+    console.error("❌ Error loading NEPSE data:", error);
+    return null;
+  }
+}
+
+async function toggleNepseUpdates() {
+  state.isNepseEnabled = !state.isNepseEnabled;
+  await chrome.storage.local.set({ isNepseEnabled: state.isNepseEnabled });
+
+  // Send message to service worker
+  chrome.runtime.sendMessage({
+    type: "TOGGLE_NEPSE_UPDATES",
+    payload: state.isNepseEnabled,
+  });
+
+  updateNepseToggleUI();
+}
+
 function setupBackupRestore() {
   const menuBtn = document.getElementById("menuBtn");
   const menuContent = document.getElementById("menuContent");
@@ -65,6 +254,9 @@ function setupBackupRestore() {
   const analyticsBtn = document.getElementById("analyticsBtn");
   const privacyBtn = document.getElementById("privacyBtn");
   const termsBtn = document.getElementById("termsBtn");
+  const nepseBtn = document.getElementById("nepseBtn");
+
+  if (!menuBtn || !menuContent) return;
 
   menuBtn?.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -82,6 +274,11 @@ function setupBackupRestore() {
 
   restoreBtn?.addEventListener("click", () => {
     restoreAccounts();
+    menuContent?.classList.add("hidden");
+  });
+
+  nepseBtn?.addEventListener("click", () => {
+    toggleNepseUpdates();
     menuContent?.classList.add("hidden");
   });
 
@@ -119,15 +316,13 @@ function addMenuToHeader() {
   const header = document.querySelector(".header") as HTMLElement;
   const menuHtml = `
     <div class="menu-dropdown">
-      <button id="menuBtn" class="btn-menu">⋮</button>
       <div id="menuContent" class="menu-content hidden">
-        <button id="backupBtn">Backup Accounts</button>
-        <button id="restoreBtn">Restore Accounts</button>
+         <button id="nepseBtn">${
+           state.isNepseEnabled ? "Disable" : "Enable"
+         } Nepse Updates</button>
         <button id="analyticsBtn">
           ${state.isAnalyticsEnabled ? "Disable" : "Enable"} Analytics
         </button>
-         <button id="privacyBtn">Privacy Policy</button>
-        <button id="termsBtn">Terms of Service</button>
       </div>
     </div>
   `;
@@ -186,22 +381,36 @@ async function handleEditAccount(account: Account) {
   state.editingAccount = account.alias;
   const form = elements.form;
 
-  form.querySelector<HTMLInputElement>('[name="broker"]')!.value =
-    account.broker.toString();
-  form.querySelector<HTMLInputElement>('[name="alias"]')!.value = account.alias;
-  form.querySelector<HTMLInputElement>('[name="username"]')!.value =
-    account.username;
-  form.querySelector<HTMLInputElement>('[name="password"]')!.value =
-    account.password;
-  form.querySelector<HTMLInputElement>('[name="isPrimary"]')!.checked =
-    account.isPrimary;
+  const brokerInput = form.querySelector<HTMLInputElement>('[name="broker"]');
+  if (brokerInput) {
+    brokerInput.value = account.broker.toString();
+  }
+  const aliasInput = form.querySelector<HTMLInputElement>('[name="alias"]');
+  if (aliasInput) {
+    aliasInput.value = account.alias;
+  }
+  const usernameInput =
+    form.querySelector<HTMLInputElement>('[name="username"]');
+  if (usernameInput) {
+    usernameInput.value = account.username;
+  }
+  const passwordInput =
+    form.querySelector<HTMLInputElement>('[name="password"]');
+  if (passwordInput) {
+    passwordInput.value = account.password;
+  }
+  const isPrimaryInput =
+    form.querySelector<HTMLInputElement>('[name="isPrimary"]');
+  if (isPrimaryInput) {
+    isPrimaryInput.checked = account.isPrimary;
+  }
 
   const accountTypeInputs = form.querySelectorAll<HTMLInputElement>(
     '[name="accountType"]'
   );
-  accountTypeInputs.forEach((input) => {
+  for (const input of accountTypeInputs) {
     input.checked = input.value === account.type;
-  });
+  }
 
   showAddAccountForm();
 }
@@ -323,7 +532,7 @@ function ensureTMSPrimaryPerBroker() {
     state.accounts.filter((acc) => acc.type === "tms").map((acc) => acc.broker)
   );
 
-  brokers.forEach((broker) => {
+  for (const broker of brokers) {
     const brokerAccounts = state.accounts.filter(
       (acc) => acc.type === "tms" && acc.broker === broker
     );
@@ -337,7 +546,7 @@ function ensureTMSPrimaryPerBroker() {
           : acc
       );
     }
-  });
+  }
 }
 
 // Event Listeners
@@ -356,28 +565,41 @@ function setupEventListeners() {
 
 function setupTabSwitching() {
   const tabButtons = document.querySelectorAll(".tab-button");
+  const nepseContent = document.getElementById("nepseTab");
   const tmsContent = document.getElementById("tmsContent");
   const meroshareContent = document.getElementById("meroshareContent");
 
-  tabButtons.forEach((button) => {
+  for (const button of tabButtons) {
     button.addEventListener("click", () => {
-      tabButtons.forEach((btn) => btn.classList.remove("active"));
-      button.classList.add("active");
+      const tab = button.getAttribute("data-tab") as
+        | "nepse"
+        | "tms"
+        | "meroshare";
+      if (tab === "nepse" && !state.isNepseEnabled) {
+        return;
+      }
 
-      const tab = button.getAttribute("data-tab") as "tms" | "meroshare";
+      for (const btn of tabButtons) {
+        btn.classList.remove("active");
+      }
+      button.classList.add("active");
       state.activeTab = tab;
 
-      if (tab === "tms") {
-        tmsContent?.classList.remove("hidden");
-        meroshareContent?.classList.add("hidden");
-      } else {
-        tmsContent?.classList.add("hidden");
-        meroshareContent?.classList.remove("hidden");
+      if (nepseContent) nepseContent.style.display = "none";
+      if (tmsContent) tmsContent.style.display = "none";
+      if (meroshareContent) meroshareContent.style.display = "none";
+
+      if (tab === "nepse" && state.isNepseEnabled) {
+        if (nepseContent) nepseContent.style.display = "block";
+      } else if (tab === "tms") {
+        if (tmsContent) tmsContent.style.display = "block";
+      } else if (tab === "meroshare") {
+        if (meroshareContent) meroshareContent.style.display = "block";
       }
 
       renderAccountsList();
     });
-  });
+  }
 }
 
 // Form Handling
@@ -589,9 +811,9 @@ function renderAccountGroup(
     return;
   }
 
-  accounts.forEach((account) => {
+  for (const account of accounts) {
     container.appendChild(createAccountElement(account));
-  });
+  }
 }
 
 function createAccountElement(account: Account): HTMLDivElement {
@@ -651,12 +873,10 @@ function showNotification(message: string, type: "success" | "error") {
 }
 
 async function saveAccounts() {
-  try {
-    await chrome.storage.local.set({ accounts: state.accounts });
-  } catch (error) {
-    throw error;
-  }
+  await chrome.storage.local.set({ accounts: state.accounts });
 }
 
 // Initialize on DOM load
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", () => {
+  init();
+});

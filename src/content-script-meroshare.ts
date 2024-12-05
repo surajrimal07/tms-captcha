@@ -1,13 +1,13 @@
 import {
-  Account,
   ANALYTICS_ENDPOINT,
-  AngularComponent,
-  Config,
+  type Account,
+  type AngularComponent,
   CONFIG,
-  Credentials,
-  MEROSHARE_LOGIN_URL,
+  type Config,
+  type Credentials,
   MEROSHAREDASHBOARD_PATTERN,
-  Select2Instance,
+  MEROSHARE_LOGIN_URL,
+  type Select2Instance,
 } from "./interface";
 
 class FormHandler {
@@ -42,7 +42,9 @@ class FormHandler {
 
   public cleanup(): void {
     this.abortController.abort();
-    Object.values(this.signals).forEach((controller) => controller.abort());
+    for (const controller of Object.values(this.signals)) {
+      controller.abort();
+    }
   }
 
   private async waitForForm(): Promise<void> {
@@ -145,7 +147,13 @@ class FormHandler {
   ): Promise<void> {
     nativeSelect.value = targetOption.value;
 
-    const select2Instance = (window as any)
+    const select2Instance = (
+      window as unknown as {
+        jQuery?: (element: HTMLElement) => {
+          data: (key: string) => Select2Instance | undefined;
+        };
+      }
+    )
       .jQuery?.(nativeSelect)
       .data("select2") as Select2Instance | undefined;
 
@@ -171,16 +179,22 @@ class FormHandler {
     element: HTMLElement,
     eventTypes: readonly string[]
   ): void {
-    eventTypes.forEach((eventType) => {
+    for (const eventType of eventTypes) {
       element.dispatchEvent(new Event(eventType, { bubbles: true }));
-    });
+    }
   }
 
   private async updateAngularComponent(
     element: Element,
     value: string
   ): Promise<void> {
-    const ng = (window as any)["ng"];
+    const ng = (
+      window as {
+        ng?: {
+          probe: (element: Element) => { componentInstance?: AngularComponent };
+        };
+      }
+    ).ng;
     if (!ng) return;
 
     const ngElement = ng.probe(element);

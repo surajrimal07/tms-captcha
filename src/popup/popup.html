@@ -13,16 +13,67 @@
         <!-- Main accounts section -->
         <div id="accountsSection" class="accounts-section">
             <div class="header">
-                <h1>Manage Accounts</h1>
-                <button id="addAccountBtn" class="btn-add" title="Add new account">
-                    Add Account
-                </button>
+                <h1>Trade Manager</h1>
+                <div class="menu-dropdown">
+                    <button id="menuBtn" class="btn-menu">⋮</button>
+                    <div id="menuContent" class="menu-content hidden">
+                        <button id="addAccountBtn">Add new account</button>
+                        <button id="backupBtn">Backup Accounts</button>
+                        <button id="restoreBtn">Restore Accounts</button>
+                        <button id="nepseBtn">Nepse Live</button>
+                        <button id="analyticsBtn">Analytics</button>
+                        <button id="privacyBtn">Privacy Policy</button>
+                        <button id="termsBtn">Terms of Service</button>
+                    </div>
+                </div>
             </div>
             <div class="tabs">
-                <button class="tab-button active" data-tab="tms">TMS Account</button>
-                <button class="tab-button" data-tab="meroshare">Meroshare Account</button>
+                <button class="tab-button active" data-tab="nepse">Nepse</button>
+                <button class="tab-button" data-tab="tms">TMS</button>
+                <button class="tab-button" data-tab="meroshare">Meroshare</button>
             </div>
-            <div id="tmsContent" class="tab-content">
+
+            <div class="tab-content" id="nepseTab">
+                <div class="nepse-container">
+                    <div class="market-status">
+                        <div class="status-indicator"></div>
+                        <span class="status-text">Market Open</span>
+                    </div>
+
+                    <div class="index-display">
+                        <div class="main-index">
+                            <span id="nepseClose"></span>
+                            <div class="change-indicator">
+                                <span id="nepseChange"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-label">Open</span>
+                            <span id="nepseOpen" class="stat-value"></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">High</span>
+                            <span id="nepseHigh" class="stat-value"></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Low</span>
+                            <span id="nepseLow" class="stat-value"></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Turnover</span>
+                            <span id="nepseTurnover" class="stat-value"></span>
+                        </div>
+                    </div>
+
+                    <div class="last-update">
+                        Last Updated: <span id="nepseTime"></span>
+                    </div>
+                </div>
+            </div>
+            <div id="tmsContent" class="tab-content hidden">
                 <div id="accountsList" class="accounts-list"></div>
             </div>
             <div id="meroshareContent" class="tab-content hidden">
@@ -84,6 +135,7 @@
 
         <div id="notification" class="notification hidden"></div>
     </div>
+
     <script src="popup.ts" type="module"></script>
 </body>
 

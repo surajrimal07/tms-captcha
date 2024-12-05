@@ -1,9 +1,9 @@
 import { solve_captcha } from "./evaluate";
 import {
-  Account,
   ANALYTICS_ENDPOINT,
+  type Account,
   ResultTypes,
-  SolveResult,
+  type SolveResult,
   TMS_DASHBOARD_PATTERN,
 } from "./interface";
 
@@ -119,14 +119,14 @@ const target = document?.querySelector(
 );
 
 window.onload = async () => {
-  let captcha_blob_url = target?.getAttribute("src");
+  const captcha_blob_url = target?.getAttribute("src");
 
   if (
     !captcha_blob_url?.includes("captcha-image.jpg") &&
     captcha_blob_url != null &&
-    captcha_blob_url != undefined
+    captcha_blob_url !== undefined
   ) {
-    let result = await solve_captcha(captcha_blob_url);
+    const result = await solve_captcha(captcha_blob_url);
 
     handle_result(result);
   } else {
@@ -141,18 +141,24 @@ const config = {
 };
 
 const observer = new MutationObserver(async (mutation_list, _) => {
-  let mutated = mutation_list.filter((item) => item.attributeName === "src")[0];
+  const mutated = mutation_list.filter(
+    (item) => item.attributeName === "src"
+  )[0];
 
-  let target_element = mutated.target as HTMLElement;
-  let captcha_blob_url = target_element.getAttribute("src");
+  const target_element = mutated.target as HTMLElement;
+  const captcha_blob_url = target_element.getAttribute("src");
 
   if (!captcha_blob_url) {
     return;
   }
 
-  let result = await solve_captcha(captcha_blob_url);
+  const result = await solve_captcha(captcha_blob_url);
 
   handle_result(result);
 });
 
-observer.observe(target!, config);
+if (target) {
+  observer.observe(target, config);
+} else {
+  console.error("Target element for captcha not found.");
+}
