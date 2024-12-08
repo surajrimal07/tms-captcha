@@ -1,6 +1,11 @@
 {
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "nepse-account-manager@surajrimal.dev"
+    }
+  },
   "name": "Nepse Account Manager",
-  "description": "A browser extension to enhance user experience for Nepal Stock Exchange (NEPSE) TMS and Meroshare platforms. Helps users manage and auto-fill login credentials for Nepal's stock market platforms.",
+  "description": "A browser extension to enhance user experience for Nepal Stock Exchange (NEPSE) TMS and Meroshare platforms.",
   "version": "0.5.2",
   "author": "Suraj Rimal <davidparkedme@gmail.com>",
   "manifest_version": 3,
@@ -10,8 +15,7 @@
   "permissions": ["storage", "background"],
   "host_permissions": ["https://*.pusher.com/*", "wss://*.pusher.com/*"],
   "background": {
-    "service_worker": "background.ts",
-    "type": "module"
+    "scripts": ["background.ts"]
   },
   "icons": {
     "16": "images/icon16.png",
