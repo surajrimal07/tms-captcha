@@ -61,11 +61,6 @@ async function init() {
   await loadAccounts();
   await loadAnalyticsState();
   await loadNepseState();
-  const savedNepseData = await loadNepseData();
-  if (savedNepseData) {
-    state.nepseData = savedNepseData;
-    updateNepseUI();
-  }
   setupEventListeners();
   setupTabSwitching();
   setupBackupRestore();
@@ -220,15 +215,28 @@ async function loadNepseState() {
   const result = await chrome.storage.local.get("isNepseEnabled");
 
   state.isNepseEnabled = result.isNepseEnabled !== false;
+
+  if (state.isNepseEnabled) {
+    await loadNepseData();
+  }
+
   updateNepseToggleUI();
 }
 
-async function loadNepseData(): Promise<NepseDataSubset | null> {
+async function loadNepseData() {
   try {
-    const result = await chrome.storage.local.get("nepseData");
-    return result.nepseData || null;
+    const result = await chrome.storage.local.get(["nepseData", "isNepseOpen"]);
+
+    state.isOpen = result.isNepseOpen ?? false;
+
+    if (result.nepseData) {
+      state.nepseData = result.nepseData;
+      updateNepseUI();
+      return result.nepseData;
+    }
+    return null;
   } catch (error) {
-    console.error("❌ Error loading NEPSE data:", error);
+    console.error("Error loading NEPSE data:", error);
     return null;
   }
 }
