@@ -13,7 +13,7 @@
         <!-- Main accounts section -->
         <div id="accountsSection" class="accounts-section">
             <div class="header">
-                <h1>Trade Manager</h1>
+                <h1>Nepse Account Manager</h1>
                 <div class="menu-dropdown">
                     <button id="menuBtn" class="btn-menu">⋮</button>
                     <div id="menuContent" class="menu-content hidden">
@@ -37,11 +37,14 @@
                 <div class="nepse-container">
                     <div class="market-status">
                         <div class="status-indicator"></div>
-                        <span class="status-text">Market Open</span>
+                        <span class="status-text">Market Close</span>
                     </div>
 
                     <div class="index-display">
                         <div class="main-index">
+                            <div id="chartContainer" class="chart-container">
+                                <canvas id="nepseChart"></canvas>
+                            </div>
                             <span id="nepseClose"></span>
                             <div class="change-indicator">
                                 <span id="nepseChange"></span>
@@ -65,6 +68,22 @@
                         <div class="stat-card">
                             <span class="stat-label">Turnover</span>
                             <span id="nepseTurnover" class="stat-value"></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Shares traded</span>
+                            <span id="nepseTraded" class="stat-value"></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Transactions</span>
+                            <span id="nepseTransaction" class="stat-value"></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Script traded</span>
+                            <span id="nepseScriptTraded" class="stat-value"></span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">P Close</span>
+                            <span id="nepsePreviousClose" class="stat-value"></span>
                         </div>
                     </div>
 
