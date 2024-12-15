@@ -1,10 +1,20 @@
 // background.ts
 import PusherWorker from "pusher-js/worker";
-import type { NepseDataSubset, NepseRawData } from "./interface";
+import type { ChartDataArray } from "./chart/interfact";
+import {
+  type NepseChartDataRaw,
+  type NepseData,
+  type NepseRawData,
+  NepseState,
+} from "./interface";
 
 // background.ts
 let pusher: PusherWorker | null = null;
 let ports: chrome.runtime.Port[] = [];
+
+let currentNepseData: NepseData | null = null;
+let isNepseOpen: NepseState = NepseState.CLOSE;
+let currentNepseIndexChart: ChartDataArray | null = null;
 
 // Connect to Pusher on service worker startup
 chrome.runtime.onStartup.addListener(async () => {
@@ -32,6 +42,23 @@ chrome.runtime.onConnect.addListener((port) => {
     ports = ports.filter((p) => p !== port);
   });
 });
+
+function sendNepseUpdate() {
+  for (const port of ports) {
+    try {
+      port.postMessage({
+        type: "NEPSE_COMBINED_UPDATE",
+        payload: {
+          data: currentNepseData,
+          isOpen: isNepseOpen,
+          nepseIndexChart: currentNepseIndexChart,
+        },
+      });
+    } catch (error) {
+      console.error("Error sending NEPSE update:", error);
+    }
+  }
+}
 
 function initializePusher() {
   if (!pusher) {
@@ -93,10 +120,22 @@ function initializePusher() {
       console.error("❌ Channel subscription error:", err);
     });
 
+    channel.bind("nepseintradaychart", (rawData: NepseChartDataRaw) => {
+      console.log("🚀 rawData of nepse index chart", rawData);
+      try {
+        currentNepseIndexChart = rawData.message;
+
+        chrome.storage.local.set({ nepseChartData: currentNepseIndexChart });
+        sendNepseUpdate();
+      } catch (error) {
+        console.error("❌ Error processing NEPSE data:", error);
+      }
+    });
+
     channel.bind("nepseindex", (rawData: NepseRawData) => {
       try {
         const data = rawData.message;
-        const nepseData: NepseDataSubset = {
+        currentNepseData = {
           time: data.time,
           isOpen: data.isOpen,
           open: data.open,
@@ -106,36 +145,27 @@ function initializePusher() {
           change: data.change,
           percentageChange: data.percentageChange,
           turnover: data.turnover,
+          totalTradedShared: data.totalTradedShared,
+          totalTransactions: data.totalTransactions,
+          totalScripsTraded: data.totalScripsTraded,
+          fiftyTwoWeekHigh: data.fiftyTwoWeekHigh,
+          fiftyTwoWeekLow: data.fiftyTwoWeekLow,
+          previousClose: data.previousClose,
         };
 
-        // Save to storage
-        chrome.storage.local.set({ nepseData });
-
-        // Notify all connected popups
-        for (const port of ports) {
-          port.postMessage({
-            type: "NEPSE_DATA_UPDATE",
-            payload: nepseData,
-          });
-        }
+        chrome.storage.local.set({ nepseData: currentNepseData });
+        sendNepseUpdate();
       } catch (error) {
         console.error("❌ Error processing NEPSE data:", error);
       }
     });
 
-    channel.bind("isnepseopen", (rawData: { message: boolean }) => {
+    channel.bind("isnepseopen", (rawData: { message: NepseState }) => {
       try {
-        const isOpen = rawData.message;
+        isNepseOpen = rawData.message;
+        chrome.storage.local.set({ isNepseOpen });
 
-        chrome.storage.local.set({ isNepseOpen: isOpen });
-
-        // Notify popups
-        for (const port of ports) {
-          port.postMessage({
-            type: "NEPSE_STATUS_UPDATE",
-            payload: isOpen,
-          });
-        }
+        sendNepseUpdate();
       } catch (error) {
         console.error("❌ Error processing NEPSE open status:", error);
       }
@@ -145,6 +175,19 @@ function initializePusher() {
 
 // Message handling
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "CHECK_PUSHER_CONNECTION") {
+    const needsReconnect = !pusher || pusher.connection.state !== "connected";
+    sendResponse({ needsReconnect });
+  }
+
+  if (message.type === "REINITIALIZE_PUSHER") {
+    if (!pusher || pusher.connection.state !== "connected") {
+      console.log("🔄 Reinitializing Pusher connection from popup...");
+      initializePusher();
+    }
+    sendResponse({ success: true });
+  }
+
   if (message.type === "TOGGLE_NEPSE_UPDATES") {
     const isEnabled = message.payload;
     if (isEnabled && !pusher) {

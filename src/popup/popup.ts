@@ -1,20 +1,57 @@
-import type { Account, NepseDataSubset } from "../interface";
-import { formatTurnover } from "../util";
+import { Chart } from "../chart/chart";
+import { defaultNepseIndexData } from "../chart/data";
+import type { ChartDataArray, ChartDataPoint } from "../chart/interfact";
+import {
+  loadDefaultNepseData,
+  loadDefaultNepseIndexData,
+  loadNepseOpen,
+} from "../fetcher";
+import {
+  type Account,
+  type NepseData,
+  NepseState,
+  defaultNepseData,
+} from "../interface";
+import { formatNumber, formatTurnover } from "../util";
 
 let port: chrome.runtime.Port;
+let chartInstance: Chart | null = null;
 
 function connectToServiceWorker() {
   port = chrome.runtime.connect({ name: "popup" });
 
-  port.onMessage.addListener((message) => {
-    if (message.type === "NEPSE_DATA_UPDATE") {
-      state.nepseData = message.payload;
-      updateNepseUI();
-    } else if (message.type === "NEPSE_STATUS_UPDATE") {
-      state.isOpen = message.payload;
+  chrome.runtime.sendMessage(
+    { type: "CHECK_PUSHER_CONNECTION" },
+    (response) => {
+      if (response?.needsReconnect) {
+        chrome.runtime.sendMessage({ type: "REINITIALIZE_PUSHER" });
+      }
+    }
+  );
+
+  port.onMessage.addListener(
+    (message: {
+      type: "NEPSE_COMBINED_UPDATE";
+      payload: {
+        data: NepseData | null;
+        isOpen: NepseState;
+        nepseIndexChart: ChartDataArray | null;
+      };
+    }) => {
+      const { data, isOpen, nepseIndexChart } = message.payload;
+
+      if (data) state.nepseData = data;
+      state.isOpen = isOpen;
+
+      if (nepseIndexChart && chartInstance) {
+        state.nepseIndexChart = nepseIndexChart;
+        chartInstance.updateData(nepseIndexChart);
+        chartInstance.render();
+      }
+
       updateNepseUI();
     }
-  });
+  );
 }
 
 // State management
@@ -24,18 +61,9 @@ const state = {
   isAnalyticsEnabled: true,
   activeTab: "nepse" as "nepse" | "tms" | "meroshare",
   isNepseEnabled: true,
-  isOpen: false,
-  nepseData: {
-    time: "2024-12-04T14:59:59.977",
-    isOpen: false,
-    open: 2775.4,
-    high: 2795.7847,
-    low: 2747.6513,
-    close: 2750.87,
-    change: -24.97,
-    percentageChange: -0.89,
-    turnover: 9132468906.77,
-  } as NepseDataSubset,
+  isOpen: NepseState.CLOSE as NepseState,
+  nepseData: {} as NepseData,
+  nepseIndexChart: [] as ChartDataPoint[],
 };
 
 // DOM Elements
@@ -53,20 +81,23 @@ const elements = {
   analyticsBtn: document.getElementById("analyticsBtn") as HTMLButtonElement,
   nepseToggle: document.getElementById("nepseBtn") as HTMLButtonElement,
   nepseTab: document.getElementById("nepseTab") as HTMLDivElement,
+  chartCanvas: document.getElementById("nepseChart") as HTMLCanvasElement,
 };
 
 // Core initialization
 async function init() {
-  connectToServiceWorker();
   await loadAccounts();
   await loadAnalyticsState();
   await loadNepseState();
+  if (state.isNepseEnabled) connectToServiceWorker();
   setupEventListeners();
   setupTabSwitching();
   setupBackupRestore();
   renderAccountsList();
   elements.addAccountSection.classList.add("hidden");
   addMenuToHeader();
+
+  initializeChart();
 
   // Initialize correct content visibility based on Nepse state
   const nepseContent = document.getElementById("nepseTab");
@@ -110,7 +141,20 @@ async function toggleAnalytics() {
 }
 
 function updateNepseUI() {
-  const { time, open, high, low, close, change, turnover } = state.nepseData;
+  const {
+    time,
+    open,
+    high,
+    low,
+    close,
+    change,
+    turnover,
+    totalTradedShared,
+    totalTransactions,
+    totalScripsTraded,
+    previousClose,
+    percentageChange,
+  } = state.nepseData;
 
   const isPositive = change >= 0;
 
@@ -122,16 +166,20 @@ function updateNepseUI() {
     close: document.getElementById("nepseClose"),
     change: document.getElementById("nepseChange"),
     turnover: document.getElementById("nepseTurnover"),
+    shareTraded: document.getElementById("nepseTraded"),
+    transaction: document.getElementById("nepseTransaction"),
+    scriptTraded: document.getElementById("nepseScriptTraded"),
+    pClose: document.getElementById("nepsePreviousClose"),
     statusText: document.querySelector(".status-text"),
     statusIndicator: document.querySelector(".status-indicator"),
   };
 
   if (elements.statusText && elements.statusIndicator) {
-    elements.statusText.textContent = state.isOpen
-      ? "Market Open"
-      : "Market Closed";
-    elements.statusIndicator.classList.toggle("active", state.isOpen);
-    elements.statusText.classList.toggle("active", state.isOpen);
+    const stateClass = String(state.isOpen).toLowerCase().replace(/\s+/g, "-");
+
+    elements.statusText.textContent = `Market ${state.isOpen}`;
+    elements.statusText.className = `status-text ${stateClass}`;
+    elements.statusIndicator.className = `status-indicator ${stateClass}`;
   }
 
   const indexDisplay = document.querySelector(".index-display");
@@ -140,7 +188,20 @@ function updateNepseUI() {
     indexDisplay.classList.add(isPositive ? "positive" : "negative");
   }
 
-  // Update change indicator arrow
+  // Update chart container colors
+  const chartContainer = document.querySelector(".chart-container");
+  if (chartContainer) {
+    chartContainer.classList.remove("positive", "negative");
+    chartContainer.classList.add(isPositive ? "positive" : "negative");
+  }
+
+  if (elements.change) {
+    const formattedChange =
+      change > 0 ? `+${formatNumber(change)}` : formatNumber(change);
+    const formattedPercentage = formatNumber(percentageChange);
+    elements.change.textContent = `${formattedChange} / ${formattedPercentage}%`;
+  }
+
   const changeIndicator = document.querySelector(".change-indicator");
   if (changeIndicator) {
     changeIndicator.classList.remove("positive", "negative");
@@ -152,27 +213,39 @@ function updateNepseUI() {
   }
 
   if (elements.open) {
-    elements.open.textContent = open.toFixed(2);
+    elements.open.textContent = formatNumber(open);
   }
 
   if (elements.high) {
-    elements.high.textContent = high.toFixed(2);
+    elements.high.textContent = formatNumber(high);
   }
 
   if (elements.low) {
-    elements.low.textContent = low.toFixed(2);
+    elements.low.textContent = formatNumber(low);
   }
 
   if (elements.close) {
-    elements.close.textContent = close.toFixed(2);
-  }
-
-  if (elements.change) {
-    elements.change.textContent = change.toFixed(2);
+    elements.close.textContent = formatNumber(close);
   }
 
   if (elements.turnover) {
     elements.turnover.textContent = formatTurnover(turnover);
+  }
+
+  if (elements.shareTraded) {
+    elements.shareTraded.textContent = totalTradedShared.toString();
+  }
+
+  if (elements.transaction) {
+    elements.transaction.textContent = totalTransactions.toString();
+  }
+
+  if (elements.scriptTraded) {
+    elements.scriptTraded.textContent = totalScripsTraded.toString();
+  }
+
+  if (elements.pClose) {
+    elements.pClose.textContent = formatNumber(previousClose);
   }
 }
 
@@ -182,11 +255,8 @@ function updateNepseToggleUI() {
   const tmsTab = document.querySelector('[data-tab="tms"]');
   const nepseContent = document.querySelector("#nepseTab");
   const tmsContent = document.querySelector("#tmsContent");
-  const status = state.isNepseEnabled ? "enabled" : "disabled";
 
-  btn.textContent = state.isNepseEnabled
-    ? "Disable Nepse Live"
-    : "Enable Nepse Live";
+  btn.textContent = state.isNepseEnabled ? "Disable Update" : "Enable Update";
   btn.classList.toggle("active", state.isNepseEnabled);
 
   if (nepseTab) {
@@ -211,33 +281,65 @@ function updateNepseToggleUI() {
   }
 }
 
-async function loadNepseState() {
-  const result = await chrome.storage.local.get("isNepseEnabled");
+async function initializeChart() {
+  if (!elements.chartCanvas) return;
 
-  state.isNepseEnabled = result.isNepseEnabled !== false;
+  let rawData: ChartDataPoint[] = [];
 
-  if (state.isNepseEnabled) {
-    await loadNepseData();
+  try {
+    // First try state data
+    if (state.nepseIndexChart?.length) {
+      rawData = state.nepseIndexChart;
+    } else {
+      const storage = await chrome.storage.local.get("nepseChartData");
+      if (storage.nepseChartData?.length) {
+        rawData = storage.nepseChartData;
+      } else {
+        rawData = await loadDefaultNepseIndexData();
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load chart data:", error);
+    rawData = defaultNepseIndexData;
   }
 
-  updateNepseToggleUI();
+  chartInstance = new Chart(elements.chartCanvas, rawData);
+  chartInstance.render();
 }
 
-async function loadNepseData() {
+async function loadNepseState(): Promise<void> {
   try {
-    const result = await chrome.storage.local.get(["nepseData", "isNepseOpen"]);
+    const { isNepseEnabled } = await chrome.storage.local.get("isNepseEnabled");
+    state.isNepseEnabled = isNepseEnabled ?? state.isNepseEnabled;
 
-    state.isOpen = result.isNepseOpen ?? false;
-
-    if (result.nepseData) {
-      state.nepseData = result.nepseData;
-      updateNepseUI();
-      return result.nepseData;
+    if (!state.isNepseEnabled) {
+      updateNepseToggleUI();
+      return;
     }
-    return null;
+
+    const storage = await chrome.storage.local.get([
+      "nepseData",
+      "isNepseOpen",
+    ]);
+
+    if (!storage || !storage.nepseData || storage.isNepseOpen === undefined) {
+      const [defaultData, nepseOpen] = await Promise.all([
+        loadDefaultNepseData(),
+        loadNepseOpen(),
+      ]);
+
+      state.isOpen = nepseOpen;
+      state.nepseData = defaultData;
+    } else {
+      state.isOpen = NepseState.CLOSE;
+      state.nepseData = defaultNepseData;
+    }
+
+    updateNepseUI();
   } catch (error) {
     console.error("Error loading NEPSE data:", error);
-    return null;
+  } finally {
+    updateNepseToggleUI();
   }
 }
 

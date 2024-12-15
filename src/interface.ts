@@ -1,3 +1,5 @@
+import type { ChartDataArray } from "./chart/interfact";
+
 export enum ResultTypes {
   Success = 0,
   LowConfidence = 1,
@@ -36,6 +38,19 @@ export interface NepseRawData {
   event: string;
 }
 
+export interface NepseChartDataRaw {
+  message: ChartDataArray;
+  channel: string;
+  event: string;
+}
+
+export enum NepseState {
+  CLOSE = "Close",
+  OPEN = "Open",
+  PRE_OPEN = "Pre Open",
+  PRE_CLOSE = "Pre Close",
+}
+
 export interface NepseData {
   time: string;
   open: number;
@@ -54,18 +69,23 @@ export interface NepseData {
   previousClose: number;
 }
 
-export type NepseDataSubset = Pick<
-  NepseData,
-  | "time"
-  | "open"
-  | "high"
-  | "low"
-  | "isOpen"
-  | "close"
-  | "change"
-  | "percentageChange"
-  | "turnover"
->;
+export const defaultNepseData: NepseData = {
+  time: "2024-12-04T14:59:59.977",
+  isOpen: false,
+  open: 2775.4,
+  high: 2795.7847,
+  low: 2747.6513,
+  close: 2750.87,
+  change: -24.97,
+  percentageChange: -0.89,
+  turnover: 9132468906.77,
+  totalTradedShared: 2919838,
+  totalTransactions: 14476,
+  totalScripsTraded: 275,
+  previousClose: 2689,
+  fiftyTwoWeekHigh: 3000.81,
+  fiftyTwoWeekLow: 1852.78,
+};
 
 export interface SolveResult {
   type: ResultTypes;
