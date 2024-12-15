@@ -1,6 +1,8 @@
 export function formatTurnover(amount: number): string {
-  const arba = 1000000000; // 1 Arba = 100 Crore = 1 Billion
-  const crore = 10000000; // 1 Crore = 10 Million
+  if (!amount || Number.isNaN(amount)) return "0";
+
+  const arba = 1000000000;
+  const crore = 10000000;
 
   if (amount >= arba) {
     const arbaValue = Math.floor((amount / arba) * 10) / 10;

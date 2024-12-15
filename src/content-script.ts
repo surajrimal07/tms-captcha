@@ -20,7 +20,6 @@ async function reload_captcha() {
     ?.dispatchEvent(new Event("click"));
 }
 
-// Memoize account lookup to prevent repeated storage calls
 const getMatchingAccount = (() => {
   let cachedAccount: Account | null = null;
   let cachedBrokerNumber: string | null = null;

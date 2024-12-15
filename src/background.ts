@@ -2,6 +2,11 @@
 import PusherWorker from "pusher-js/worker";
 import type { ChartDataArray } from "./chart/interfact";
 import {
+  loadDefaultNepseData,
+  loadDefaultNepseIndexData,
+  loadNepseOpen,
+} from "./fetcher";
+import {
   type NepseChartDataRaw,
   type NepseData,
   type NepseRawData,
@@ -16,25 +21,44 @@ let currentNepseData: NepseData | null = null;
 let isNepseOpen: NepseState = NepseState.CLOSE;
 let currentNepseIndexChart: ChartDataArray | null = null;
 
-// Connect to Pusher on service worker startup
+async function initializeDefaultData() {
+  try {
+    await loadDefaultNepseData();
+    await loadNepseOpen();
+    await loadDefaultNepseIndexData();
+
+    console.log("✅ Successfully loaded initial data");
+
+    // await Promise.all([
+    //   loadDefaultNepseData(),
+    //   loadNepseOpen(),
+    //   loadDefaultNepseIndexData(),
+    // ]);//this errors out
+  } catch (error) {
+    console.error("Error loading initial data:", error);
+  }
+}
+
 chrome.runtime.onStartup.addListener(async () => {
   const result = await chrome.storage.local.get("isNepseEnabled");
   if (result.isNepseEnabled !== false) {
-    console.log("🚀 Initializing Nepse updates on startup");
     initializePusher();
   }
 });
-
-// Also connect when installed/updated
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   const result = await chrome.storage.local.get("isNepseEnabled");
-  if (result.isNepseEnabled !== false) {
-    console.log("🚀 Initializing Nepse updates on install/update");
+
+  if (details.reason === "install") {
+    if (result.isNepseEnabled === undefined) {
+      await chrome.storage.local.set({ isNepseEnabled: true });
+      await initializeDefaultData();
+      initializePusher();
+    }
+  } else if (result.isNepseEnabled === true) {
     initializePusher();
   }
 });
 
-// Handle port connections from popup
 chrome.runtime.onConnect.addListener((port) => {
   ports.push(port);
 
@@ -61,142 +85,84 @@ function sendNepseUpdate() {
 }
 
 function initializePusher() {
-  if (!pusher) {
-    pusher = new PusherWorker("dbdb40ced4f07c947017", {
-      cluster: "ap2",
-    });
+  if (!pusher || pusher.connection.state !== "connected") {
+    pusher = new PusherWorker("dbdb40ced4f07c947017", { cluster: "ap2" });
 
-    // Connection state handlers
-    pusher.connection.bind("connecting", () => {
-      console.log("⌛ Attempting to connect to Pusher...");
-    });
-
-    pusher.connection.bind("connected", () => {
-      console.log("✅ Successfully connected to Pusher");
-    });
-
-    pusher.connection.bind("failed", () => {
-      console.error("❌ Failed to connect to Pusher");
-      // Retry connection after delay
+    pusher.connection.bind("connecting", () =>
+      console.log("⌛ Attempting to connect to Pusher...")
+    );
+    pusher.connection.bind("connected", () =>
+      console.log("✅ Successfully connected to Pusher")
+    );
+    pusher.connection.bind("failed", () =>
       setTimeout(() => {
         console.log("🔄 Retrying Pusher connection...");
         pusher?.connect();
-      }, 5000);
-    });
-
-    pusher.connection.bind("disconnected", () => {
-      console.log("🔌 Disconnected from Pusher");
-    });
-
-    pusher.connection.bind("error", (err: unknown) => {
-      let errorMessage = "Unknown error";
-
-      if (err instanceof Error) {
-        errorMessage = `${err.name}: ${err.message}`;
-        if (err.stack) {
-          console.error("Stack trace:", err.stack);
-        }
-      } else if (typeof err === "object" && err !== null) {
-        try {
-          errorMessage = JSON.stringify(err, null, 2);
-        } catch {
-          errorMessage = String(err);
-        }
-      } else {
-        errorMessage = String(err);
-      }
-
-      console.error("❌ Pusher connection error:", errorMessage);
-    });
+      }, 5000)
+    );
+    pusher.connection.bind("disconnected", () =>
+      console.log("🔌 Disconnected from Pusher")
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    pusher.connection.bind("error", (err: any) =>
+      console.error("❌ Pusher connection error:", err)
+    );
 
     const channel = pusher.subscribe("nepseapi");
 
-    channel.bind("pusher:subscription_succeeded", () => {
-      console.log("✅ Successfully subscribed to nepseapi channel");
-    });
-
-    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-    channel.bind("pusher:subscription_error", (err: any) => {
-      console.error("❌ Channel subscription error:", err);
-    });
+    channel.bind("pusher:subscription_succeeded", () =>
+      console.log("✅ Successfully subscribed to nepseapi channel")
+    );
 
     channel.bind("nepseintradaychart", (rawData: NepseChartDataRaw) => {
-      console.log("🚀 rawData of nepse index chart", rawData);
-      try {
-        currentNepseIndexChart = rawData.message;
-
-        chrome.storage.local.set({ nepseChartData: currentNepseIndexChart });
-        sendNepseUpdate();
-      } catch (error) {
-        console.error("❌ Error processing NEPSE data:", error);
-      }
+      currentNepseIndexChart = rawData.message;
+      chrome.storage.local.set({ nepseChartData: currentNepseIndexChart });
+      sendNepseUpdate();
     });
 
     channel.bind("nepseindex", (rawData: NepseRawData) => {
-      try {
-        const data = rawData.message;
-        currentNepseData = {
-          time: data.time,
-          isOpen: data.isOpen,
-          open: data.open,
-          high: data.high,
-          low: data.low,
-          close: data.close,
-          change: data.change,
-          percentageChange: data.percentageChange,
-          turnover: data.turnover,
-          totalTradedShared: data.totalTradedShared,
-          totalTransactions: data.totalTransactions,
-          totalScripsTraded: data.totalScripsTraded,
-          fiftyTwoWeekHigh: data.fiftyTwoWeekHigh,
-          fiftyTwoWeekLow: data.fiftyTwoWeekLow,
-          previousClose: data.previousClose,
-        };
-
-        chrome.storage.local.set({ nepseData: currentNepseData });
-        sendNepseUpdate();
-      } catch (error) {
-        console.error("❌ Error processing NEPSE data:", error);
-      }
+      currentNepseData = rawData.message;
+      console.log(`new nepse data: ${JSON.stringify(currentNepseData)}`);
+      chrome.storage.local.set({ nepseData: currentNepseData });
+      sendNepseUpdate();
     });
 
     channel.bind("isnepseopen", (rawData: { message: NepseState }) => {
-      try {
-        isNepseOpen = rawData.message;
-        chrome.storage.local.set({ isNepseOpen });
-
-        sendNepseUpdate();
-      } catch (error) {
-        console.error("❌ Error processing NEPSE open status:", error);
-      }
+      isNepseOpen = rawData.message;
+      chrome.storage.local.set({ isNepseOpen });
+      sendNepseUpdate();
     });
   }
 }
 
-// Message handling
+function toggleNepseUpdates(isEnabled: boolean) {
+  if (isEnabled) {
+    initializePusher();
+  } else if (!isEnabled && pusher) {
+    pusher.disconnect();
+    pusher = null;
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "CHECK_PUSHER_CONNECTION") {
-    const needsReconnect = !pusher || pusher.connection.state !== "connected";
-    sendResponse({ needsReconnect });
-  }
-
-  if (message.type === "REINITIALIZE_PUSHER") {
-    if (!pusher || pusher.connection.state !== "connected") {
-      console.log("🔄 Reinitializing Pusher connection from popup...");
+  switch (message.type) {
+    case "CHECK_PUSHER_CONNECTION":
       initializePusher();
-    }
-    sendResponse({ success: true });
-  }
+      sendResponse({
+        needsReconnect: !pusher || pusher.connection.state !== "connected",
+      });
+      break;
 
-  if (message.type === "TOGGLE_NEPSE_UPDATES") {
-    const isEnabled = message.payload;
-    if (isEnabled && !pusher) {
-      initializePusher();
-    } else if (!isEnabled && pusher) {
-      pusher.disconnect();
-      pusher = null;
+    case "TOGGLE_NEPSE_UPDATES": {
+      const isEnabled = message.payload;
+      toggleNepseUpdates(isEnabled);
+      sendResponse({ success: true });
+      break;
     }
-    sendResponse({ success: true });
+
+    default:
+      sendResponse({ success: false, message: "Unknown message type" });
+      break;
   }
   return true;
 });
