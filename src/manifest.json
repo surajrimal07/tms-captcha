@@ -1,53 +1,53 @@
 {
-  "name": "Nepse Account Manager",
-  "description": "Browser extension enhancing NEPSE TMS and Meroshare with live updates, login management, and auto-fill for better UX.",
-  "version": "0.5.6",
-  "author": "Suraj Rimal <davidparkedme@gmail.com>",
-  "manifest_version": 3,
-  "content_security_policy": {
-    "extension_pages": "script-src 'self' "
-  },
-  "permissions": ["storage", "background"],
-  "host_permissions": ["https://*.pusher.com/*", "wss://*.pusher.com/*"],
-  "background": {
-    "service_worker": "background.ts",
-    "type": "module"
-  },
-  "icons": {
-    "16": "images/icon16.png",
-    "32": "images/icon32.png",
-    "48": "images/icon48.png",
-    "128": "images/icon128.png"
-  },
-  "action": {
-    "default_icon": {
-      "16": "images/icon16.png",
-      "32": "images/icon32.png",
-      "48": "images/icon48.png",
-      "128": "images/icon128.png"
-    },
-    "default_title": "Nepse Account Manager",
-    "default_popup": "popup/popup.html"
-  },
-  "content_scripts": [
-    {
-      "matches": ["https://*.nepsetms.com.np/login"],
-      "js": [
-        "content-script.ts",
-        "evaluate.ts",
-        "data/bold_data.json",
-        "data/slim_data.json"
-      ]
-    },
-    {
-      "matches": ["*://meroshare.cdsc.com.np/*"],
-      "js": ["content-script-meroshare.ts"]
-    }
-  ],
-  "web_accessible_resources": [
-    {
-      "resources": ["assets/empty.jpg"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+	"name": "Nepse Account Manager",
+	"description": "Browser extension enhancing NEPSE TMS and Meroshare with live updates, login management, and auto-fill for better UX.",
+	"version": "0.5.8",
+	"author": "Suraj Rimal <davidparkedme@gmail.com>",
+	"manifest_version": 3,
+	"content_security_policy": {
+		"extension_pages": "script-src 'self' "
+	},
+	"permissions": ["storage", "background"],
+	"host_permissions": ["https://*.pusher.com/*", "wss://*.pusher.com/*"],
+	"background": {
+		"service_worker": "background.ts",
+		"type": "module"
+	},
+	"icons": {
+		"16": "images/icon16.png",
+		"32": "images/icon32.png",
+		"48": "images/icon48.png",
+		"128": "images/icon128.png"
+	},
+	"action": {
+		"default_icon": {
+			"16": "images/icon16.png",
+			"32": "images/icon32.png",
+			"48": "images/icon48.png",
+			"128": "images/icon128.png"
+		},
+		"default_title": "Nepse Account Manager",
+		"default_popup": "popup/popup.html"
+	},
+	"content_scripts": [
+		{
+			"matches": ["https://*.nepsetms.com.np/login"],
+			"js": [
+				"content-script.ts",
+				"evaluate.ts",
+				"data/bold_data.json",
+				"data/slim_data.json"
+			]
+		},
+		{
+			"matches": ["*://meroshare.cdsc.com.np/*"],
+			"js": ["content-script-meroshare.ts"]
+		}
+	],
+	"web_accessible_resources": [
+		{
+			"resources": ["assets/empty.jpg"],
+			"matches": ["<all_urls>"]
+		}
+	]
 }

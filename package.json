@@ -1,25 +1,25 @@
 {
-  "name": "nepse-login-helper",
-  "version": "0.5.6",
-  "repository": "git@github.com/surajrimal07/tms-captcha.git",
-  "author": "Suraj Rimal <davidparkedme@gmail.com>",
-  "license": "MIT",
-  "devDependencies": {
-    "@parcel/config-webextension": "^2.8.2",
-    "@parcel/transformer-image": "^2.8.2",
-    "@types/chrome": "^0.0.287",
-    "@types/node": "^22.10.2",
-    "buffer": "^6.0.3",
-    "parcel": "^2.13.2"
-  },
-  "dependencies": {
-    "image-js": "^0.35.2",
-    "pusher-js": "^8.4.0-rc2"
-  },
-  "scripts": {
-    "start": "parcel watch src/manifest.json --host localhost --config @parcel/config-webextension",
-    "build": "parcel build src/manifest.json --no-source-maps --config @parcel/config-webextension",
-    "calibrate": "ts-node scripts/calibrate.ts",
-    "test": "ts-node scripts/test.ts"
-  }
+	"name": "nepse-login-helper",
+	"version": "0.5.8",
+	"repository": "git@github.com/surajrimal07/tms-captcha.git",
+	"author": "Suraj Rimal <davidparkedme@gmail.com>",
+	"license": "MIT",
+	"devDependencies": {
+		"@parcel/config-webextension": "^2.8.2",
+		"@parcel/transformer-image": "^2.8.2",
+		"@types/chrome": "^0.0.287",
+		"@types/node": "^22.10.2",
+		"buffer": "^6.0.3",
+		"parcel": "^2.13.2"
+	},
+	"dependencies": {
+		"image-js": "^0.35.2",
+		"pusher-js": "^8.4.0-rc2"
+	},
+	"scripts": {
+		"start": "parcel watch src/manifest.json --host localhost --config @parcel/config-webextension",
+		"build": "parcel build src/manifest.json --no-source-maps --config @parcel/config-webextension",
+		"calibrate": "ts-node scripts/calibrate.ts",
+		"test": "ts-node scripts/test.ts"
+	}
 }
