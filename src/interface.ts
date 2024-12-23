@@ -6,20 +6,8 @@ export enum ResultTypes {
 	InvalidLength = 2,
 }
 
-export interface NepseOpenData {
-	data: string;
-	event: string;
-	channel: string;
-}
-
-export interface NepseOpenMessage {
-	message: boolean;
-}
-
 export interface NepseRawData {
-	message: {
-		data: NepseData;
-	};
+	message: NepseData;
 	channel: string;
 	event: string;
 }

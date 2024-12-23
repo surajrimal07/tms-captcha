@@ -1,7 +1,7 @@
 {
 	"name": "Nepse Account Manager",
 	"description": "Browser extension enhancing NEPSE TMS and Meroshare with live updates, login management, and auto-fill for better UX.",
-	"version": "0.5.8",
+	"version": "0.5.9",
 	"author": "Suraj Rimal <davidparkedme@gmail.com>",
 	"manifest_version": 3,
 	"content_security_policy": {

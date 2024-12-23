@@ -166,7 +166,6 @@ function updateNepseUI() {
 			totalTransactions,
 			totalScripsTraded,
 			previousClose,
-			totalCapitalization,
 			percentageChange,
 		} = state.nepseData;
 
@@ -263,7 +262,7 @@ function updateNepseUI() {
 		}
 
 		if (elements.pClose) {
-			elements.pClose.textContent = totalCapitalization;
+			elements.pClose.textContent = previousClose;
 		}
 	});
 }
