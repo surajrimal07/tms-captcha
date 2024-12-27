@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investor Sentiment Gauge</title>
+    <link rel="stylesheet" href="sidepanel.css">
+</head>
+
+<body>
+    <div class="gauge-container">
+        <h2>Sentiment</h2>
+        <div class="gauge">
+            <svg viewBox="0 0 200 150">
+                <!-- Background arc -->
+                <path class="gauge-background" d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="#eee"
+                    stroke-width="20" />
+
+
+                <!-- Red segment (0-50) -->
+                <path class="gauge-red" d="M20 100 A80 80 0 0 1 100 20" fill="none" stroke="#ff4444"
+                    stroke-width="20" />
+
+                <!-- Green segment (50-100) -->
+                <path class="gauge-green" d="M100 20 A80 80 0 0 1 180 100" fill="none" stroke="#90EE90"
+                    stroke-width="20" />
+
+                <!-- Pointer -->
+                <path class="gauge-pointer" d="M98 100 L100 40 L102 100 Z" fill="#2196F3" stroke="none" />
+
+                <!-- Labels -->
+                <text x="15" y="120" class="gauge-label">0</text>
+                <text x="45" y="85" class="gauge-label">25</text>
+                <text x="95" y="35" class="gauge-label">50</text>
+                <text x="145" y="85" class="gauge-label">75</text>
+                <text x="175" y="120" class="gauge-label">100</text>
+            </svg>
+            <div id="sentiment-value" class="gauge-value">Weak Bearish</div>
+        </div>
+    </div>
+    <div class="container">
+        <div class="header">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="gainers">Top Gainers</button>
+                <button class="tab-btn" data-tab="losers">Top Losers</button>
+            </div>
+        </div>
+        <table class="market-table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>LTP</th>
+                    <th>Point Change</th>
+                    <th>% Change</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <!-- Data will be populated by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+    <div id="contextMenu" class="context-menu" style="display: none;">
+        <button id="buyButton">Buy</button>
+        <button id="sellButton">Sell</button>
+    </div>
+    <script type="module" src="./sidepanel.ts"></script>
+</body>
+
+</html>

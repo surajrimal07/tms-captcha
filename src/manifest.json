@@ -7,7 +7,7 @@
 	"content_security_policy": {
 		"extension_pages": "script-src 'self' "
 	},
-	"permissions": ["storage", "background"],
+	"permissions": ["storage", "background", "sidePanel", "contextMenus", "tabs"],
 	"host_permissions": ["https://*.pusher.com/*", "wss://*.pusher.com/*"],
 	"background": {
 		"service_worker": "background.ts",
@@ -28,6 +28,9 @@
 		},
 		"default_title": "Nepse Account Manager",
 		"default_popup": "popup/popup.html"
+	},
+	"side_panel": {
+		"default_path": "sidepanel/sidepanel.html"
 	},
 	"content_scripts": [
 		{

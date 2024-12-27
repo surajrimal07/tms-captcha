@@ -5,12 +5,14 @@
 	"author": "Suraj Rimal <davidparkedme@gmail.com>",
 	"license": "MIT",
 	"devDependencies": {
-		"@parcel/config-webextension": "^2.8.2",
-		"@parcel/transformer-image": "^2.8.2",
+		"@parcel/config-webextension": "^2.13.3",
+		"@parcel/core": "^2.13.3",
+		"@parcel/transformer-image": "^2.13.3",
 		"@types/chrome": "^0.0.287",
 		"@types/node": "^22.10.2",
 		"buffer": "^6.0.3",
-		"parcel": "^2.13.2"
+		"parcel": "^2.13.3",
+		"svgo": "^3"
 	},
 	"dependencies": {
 		"image-js": "^0.35.2",

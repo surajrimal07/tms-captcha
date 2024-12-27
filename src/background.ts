@@ -26,14 +26,6 @@ async function initializeDefaultData() {
 		await loadDefaultNepseData();
 		await loadNepseOpen();
 		await loadDefaultNepseIndexData();
-
-		console.log("✅ Successfully loaded initial data");
-
-		// await Promise.all([
-		//   loadDefaultNepseData(),
-		//   loadNepseOpen(),
-		//   loadDefaultNepseIndexData(),
-		// ]);//this errors out
 	} catch (error) {
 		console.error("Error loading initial data:", error);
 	}
@@ -164,4 +156,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 			break;
 	}
 	return true;
+});
+
+//experimental for sidepanel api
+
+chrome.runtime.onInstalled.addListener(() => {
+	chrome.contextMenus.create({
+		id: "summarizeNews",
+		title: "Summarize News",
+		type: "normal",
+		documentUrlPatterns: ["https://merolagani.com/NewsDetail.aspx*"],
+		contexts: ["page"],
+	});
+
+	chrome.contextMenus.create({
+		id: "openSidebar",
+		type: "normal",
+		title: "Open Nepse Dashboard",
+		contexts: ["all"],
+	});
+});
+
+// Listen for clicks on the context menu
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+	chrome.storage.session.set({ newsUrl: info.pageUrl });
+
+	if (tab?.id) {
+		chrome.sidePanel.open({ tabId: tab.id });
+	}
 });
