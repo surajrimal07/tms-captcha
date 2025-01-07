@@ -5,21 +5,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Accounts</title>
+    <script src="../theme-init.js"></script>
     <link rel="stylesheet" href="popup.css">
 </head>
 
 <body>
     <div class="container">
-        <!-- Main accounts section -->
         <div id="accountsSection" class="accounts-section">
             <div class="header">
                 <h1>Nepse Account Manager</h1>
+                <button id="themeToggle" class="theme-toggle" title="Toggle theme">
+                    <svg id="themeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+                        <g id="theme-icon" fill-rule="evenodd">
+                            <path
+                                d="M12,22 C17.5228475,22 22,17.5228475 22,12 C22,6.4771525 17.5228475,2 12,2 C6.4771525,2 2,6.4771525 2,12 C2,17.5228475 6.4771525,22 12,22 Z M12,20.5 L12,3.5 C16.6944204,3.5 20.5,7.30557963 20.5,12 C20.5,16.6944204 16.6944204,20.5 12,20.5 Z" />
+                        </g>
+                    </svg>
+                </button>
                 <div class="menu-dropdown">
-                    <button id="menuBtn" class="btn-menu">⋮</button>
+                    <button id="menuBtn" class="btn-menu" title="Menu">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
                     <div id="menuContent" class="menu-content hidden">
-                        <button id="addAccountBtn">Add new account</button>
-                        <button id="backupBtn">Backup Accounts</button>
-                        <button id="restoreBtn">Restore Accounts</button>
+                        <button id="addAccountBtn">Add account</button>
+                        <button id="backupBtn">Backup</button>
+                        <button id="restoreBtn">Restore</button>
                         <button id="nepseBtn">Nepse Live</button>
                         <button id="analyticsBtn">Analytics</button>
                         <button id="privacyBtn">Privacy Policy</button>
@@ -38,7 +51,81 @@
                     <div class="market-status">
                         <div class="status-indicator"></div>
                         <span class="status-text">Market Close</span>
+                        <div class="dashboard-controls">
+                            <button class="dashboard-button info-button" title="Dashboard Info">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M12 16v-4" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                    <path d="M12 8h.01" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                            <button class="dashboard-button delete-button" title="Delete Dashboard">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M18 6L6 18" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                    <path d="M6 6l12 12" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                            <button class="dashboard-button prev-button" title="Previous Dashboard">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M15 18l-6-6 6-6" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                            </button>
+
+                            <button class="dashboard-button next-button" title="Next Dashboard">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                            <button class="dashboard-button add-dashboard-button" title="Add Dashboard">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M12 5v14" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                    <path d="M5 12h14" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
+                    <!-- <div class="Dashboard selector"> -->
+                    <div id="indexSelector" class="index-selector hidden">
+                        <div class="index-selector-content">
+                            <div class="index-selector-header">
+                                <h3>Select Index</h3>
+                                <button class="close-selector">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <path d="M18 6L6 18" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" />
+                                        <path d="M6 6l12 12" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="index-options">
+                                <button class="index-option" data-index="Banking SubIndex">Banking SubIndex</button>
+                                <button class="index-option" data-index="Development Bank Ind.">Development Bank
+                                    Ind.</button>
+                                <button class="index-option" data-index="Finance Index">Finance Index</button>
+                                <button class="index-option" data-index="Hotels And Tourism">Hotels And Tourism</button>
+                                <button class="index-option" data-index="HydroPower Index">HydroPower Index</button>
+                                <button class="index-option" data-index="Investment">Investment</button>
+                                <button class="index-option" data-index="Life Insurance">Life Insurance</button>
+                                <button class="index-option" data-index="Manufacturing And Pr.">Manufacturing And
+                                    Pr.</button>
+                                <button class="index-option" data-index="Microfinance Index">Microfinance Index</button>
+                                <button class="index-option" data-index="Mutual Fund">Mutual Fund</button>
+                                <button class="index-option" data-index="Non Life Insurance">Non Life Insurance</button>
+                                <button class="index-option" data-index="Others Index">Others Index</button>
+                                <button class="index-option" data-index="Sensitive Index">Sensitive Index</button>
+                                <button class="index-option" data-index="Trading Index">Trading Index</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- <div class="End Dashboard selector"> -->
 
                     <div class="index-display">
                         <div class="main-index">
@@ -48,6 +135,9 @@
                             <span id="nepseClose"></span>
                             <div class="change-indicator">
                                 <span id="nepseChange"></span>
+                            </div>
+                            <div class="dashboard-indicator">
+                                <span class="dashboard-dot" data-dashboard="NEPSE Index" title="NEPSE Index"></span>
                             </div>
                         </div>
                     </div>

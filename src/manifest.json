@@ -1,14 +1,18 @@
 {
 	"name": "Nepse Account Manager",
 	"description": "Browser extension enhancing NEPSE TMS and Meroshare with live updates, login management, and auto-fill for better UX.",
-	"version": "0.5.9",
+	"version": "0.6.0",
 	"author": "Suraj Rimal <davidparkedme@gmail.com>",
 	"manifest_version": 3,
 	"content_security_policy": {
 		"extension_pages": "script-src 'self' "
 	},
-	"permissions": ["storage", "background", "sidePanel", "contextMenus", "tabs"],
-	"host_permissions": ["https://*.pusher.com/*", "wss://*.pusher.com/*"],
+	"permissions": ["storage", "background", "tabs"],
+	"host_permissions": [
+		"https://nepse.surajrimal.dev/*",
+		"https://*.nepsetms.com.np/*",
+		"https://meroshare.cdsc.com.np/*"
+	],
 	"background": {
 		"service_worker": "background.ts",
 		"type": "module"
@@ -29,9 +33,6 @@
 		"default_title": "Nepse Account Manager",
 		"default_popup": "popup/popup.html"
 	},
-	"side_panel": {
-		"default_path": "sidepanel/sidepanel.html"
-	},
 	"content_scripts": [
 		{
 			"matches": ["https://*.nepsetms.com.np/login"],
@@ -45,6 +46,10 @@
 		{
 			"matches": ["*://meroshare.cdsc.com.np/*"],
 			"js": ["content-script-meroshare.ts"]
+		},
+		{
+			"matches": ["https://*.nepsetms.com.np/tms/*"],
+			"js": ["content-script-tms.ts"]
 		}
 	],
 	"web_accessible_resources": [

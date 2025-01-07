@@ -1,51 +1,64 @@
 import { Chart } from "../chart/chart";
-import type { ChartDataArray, ChartDataPoint } from "../chart/interfact";
+import type { ChartDataPoint, OtherChartDataArray } from "../chart/interfact";
+import {
+	type Account,
+	type IndexKey,
+	NEPSE_INDEX,
+	type NepseData,
+	NepseState,
+	type OtherIndexDataMap,
+	type OtherIndexKey,
+	STORAGE_KEYS,
+	SVG_ICONS,
+	type SocketMessage,
+} from "../interface";
 import {
 	loadDefaultNepseData,
 	loadDefaultNepseIndexData,
 	loadNepseOpen,
-} from "../fetcher";
-import { type Account, type NepseData, NepseState } from "../interface";
+} from "../utils";
+import { backupAccounts, restoreAccounts } from "./backup";
+import { initializeDashboard } from "./dashboard";
+import { showNotification } from "./notification";
+import { initThemeToggle } from "./theme";
 
 let chartInstance: Chart | null = null;
 let scheduledFrame: number | null = null;
 
 function connectToServiceWorker() {
 	chrome.runtime.sendMessage(
-		{ type: "CHECK_PUSHER_CONNECTION" },
+		{ type: "CHECK_SOCKET_CONNECTION" },
 		(response) => {
 			if (!response?.needsReconnect) {
 				const port = chrome.runtime.connect({ name: "popup" });
 
-				port.onMessage.addListener(
-					(message: {
-						type: "NEPSE_COMBINED_UPDATE";
-						payload: {
-							data: NepseData | null;
-							isOpen: NepseState;
-							nepseIndexChart: ChartDataArray | null;
-						};
-					}) => {
-						const { data, isOpen, nepseIndexChart } = message.payload;
-
+				port.onMessage.addListener((message: SocketMessage) => {
+					if (message.type === "NEPSE_COMBINED_UPDATE") {
+						const { data, isOpen, dashboardIndexChart } = message.payload;
 						if (data) state.nepseData = data;
-						state.isOpen = isOpen;
-
-						if (nepseIndexChart && chartInstance) {
-							state.nepseIndexChart = nepseIndexChart;
-							chartInstance.updateData(nepseIndexChart);
+						if (Object.values(NepseState).includes(isOpen))
+							state.isOpen = isOpen;
+						if (dashboardIndexChart && chartInstance) {
+							state.dashboardIndexChart = dashboardIndexChart;
+							chartInstance.updateData(dashboardIndexChart);
 							chartInstance.render();
 						}
 						updateNepseUI();
-					},
-				);
+					}
+
+					if (message.type === "OTHER_INDEX_UPDATE") {
+						const { indexes, charts } = message.payload;
+						if (indexes) state.otherIndexData = indexes;
+						if (charts) state.otherIntradayChart = charts;
+					}
+				});
 			}
 		},
 	);
 }
 
 // State management
-const state = {
+export const state = {
 	accounts: [] as Account[],
 	editingAccount: null as string | null,
 	isAnalyticsEnabled: true,
@@ -53,11 +66,28 @@ const state = {
 	isNepseEnabled: true,
 	isOpen: NepseState.CLOSE as NepseState,
 	nepseData: {} as NepseData,
-	nepseIndexChart: [] as ChartDataPoint[],
+	dashboardIndexChart: [] as ChartDataPoint[],
+	otherDashboard: [NEPSE_INDEX] as IndexKey[], //holds what other dashboard are selected
+	activeDashboard: NEPSE_INDEX as IndexKey, //current active dashboard
+	otherIndexData: {} as OtherIndexDataMap, //holds other index data
+	otherIntradayChart: [] as OtherChartDataArray, //holds other intraday chart data
+	get currentIndex() {
+		return this.activeDashboard === NEPSE_INDEX
+			? this.nepseData
+			: this.otherIndexData[this.activeDashboard as OtherIndexKey];
+	},
+	get currentIndexChart() {
+		return this.activeDashboard === NEPSE_INDEX
+			? this.dashboardIndexChart
+			: this.otherIntradayChart.find(
+					(chart) => chart.type === state.activeDashboard,
+				)?.data || [];
+	},
 };
 
 // DOM Elements
 const elements = {
+	header: document.querySelector(".header") as HTMLElement,
 	accountsList: document.getElementById("accountsList") as HTMLDivElement,
 	meroshareList: document.getElementById(
 		"meroshareAccountsList",
@@ -67,57 +97,61 @@ const elements = {
 		"addAccountSection",
 	) as HTMLDivElement,
 	accountsSection: document.getElementById("accountsSection") as HTMLDivElement,
-	notification: document.getElementById("notification") as HTMLDivElement,
 	analyticsBtn: document.getElementById("analyticsBtn") as HTMLButtonElement,
 	nepseToggle: document.getElementById("nepseBtn") as HTMLButtonElement,
 	nepseTab: document.getElementById("nepseTab") as HTMLDivElement,
+	tmsContent: document.getElementById("tmsContent") as HTMLDivElement,
+	nepseDataTab: document.querySelector('[data-tab="nepse"]') as HTMLElement,
+	tmsDataTab: document.querySelector('[data-tab="tms"]') as HTMLElement,
+
+	nepseQuery: document.querySelector("#nepseTab") as HTMLElement,
+	tmsQuery: document.querySelector("#tmsContent") as HTMLElement,
 	chartCanvas: document.getElementById("nepseChart") as HTMLCanvasElement,
 
 	//other nepse elements
-	time: document.getElementById("nepseTime"),
-	open: document.getElementById("nepseOpen"),
-	high: document.getElementById("nepseHigh"),
-	low: document.getElementById("nepseLow"),
-	close: document.getElementById("nepseClose"),
-	change: document.getElementById("nepseChange"),
-	turnover: document.getElementById("nepseTurnover"),
-	shareTraded: document.getElementById("nepseTraded"),
-	transaction: document.getElementById("nepseTransaction"),
-	scriptTraded: document.getElementById("nepseScriptTraded"),
-	pClose: document.getElementById("nepsePreviousClose"),
-	statusText: document.querySelector(".status-text"),
-	statusIndicator: document.querySelector(".status-indicator"),
-	indexDisplay: document.querySelector(".index-display"),
-	chartContainer: document.querySelector(".chart-container"),
-	changeIndicator: document.querySelector(".change-indicator"),
+	time: document.getElementById("nepseTime") as HTMLSpanElement,
+	open: document.getElementById("nepseOpen") as HTMLSpanElement,
+	high: document.getElementById("nepseHigh") as HTMLSpanElement,
+	low: document.getElementById("nepseLow") as HTMLSpanElement,
+	close: document.getElementById("nepseClose") as HTMLSpanElement,
+	change: document.getElementById("nepseChange") as HTMLSpanElement,
+	turnover: document.getElementById("nepseTurnover") as HTMLSpanElement,
+	shareTraded: document.getElementById("nepseTraded") as HTMLSpanElement,
+	transaction: document.getElementById("nepseTransaction") as HTMLSpanElement,
+	scriptTraded: document.getElementById("nepseScriptTraded") as HTMLSpanElement,
+	pClose: document.getElementById("nepsePreviousClose") as HTMLSpanElement,
+
+	statusText: document.querySelector(".status-text") as HTMLSpanElement,
+	statusIndicator: document.querySelector(
+		".status-indicator",
+	) as HTMLDivElement,
+	indexDisplay: document.querySelector(".index-display") as HTMLDivElement,
+	chartContainer: document.querySelector(".chart-container") as HTMLDivElement,
+	changeIndicator: document.querySelector(
+		".change-indicator",
+	) as HTMLDivElement,
 };
 
 // Core initialization
 async function init() {
-	await loadAccounts();
-	await loadAnalyticsState();
-	await loadNepseState();
+	await Promise.all([loadAccounts(), loadAnalyticsState(), loadNepseState()]);
 	if (state.isNepseEnabled) connectToServiceWorker();
 	setupEventListeners();
 	setupTabSwitching();
-	setupMenu();
 	renderAccountsList();
+	setupMenu();
 	elements.addAccountSection.classList.add("hidden");
-	addMenuToHeader();
+	initializeDashboard();
 
 	// Initialize correct content visibility based on Nepse state
-	const nepseContent = document.getElementById("nepseTab");
-	const tmsContent = document.getElementById("tmsContent");
 
 	if (!state.isNepseEnabled) {
-		if (nepseContent) nepseContent.style.display = "none";
-		if (tmsContent) tmsContent.style.display = "block";
+		if (elements.nepseTab) elements.nepseTab.style.display = "none";
+		if (elements.tmsContent) elements.tmsContent.style.display = "block";
 
 		// Ensure TMS tab is active
-		const nepseTab = document.querySelector('[data-tab="nepse"]');
-		const tmsTab = document.querySelector('[data-tab="tms"]');
-		nepseTab?.classList.remove("active");
-		tmsTab?.classList.add("active");
+		elements.nepseDataTab?.classList.remove("active");
+		elements.tmsDataTab?.classList.add("active");
 		state.activeTab = "tms";
 	}
 
@@ -125,49 +159,50 @@ async function init() {
 }
 
 async function toggleAnalytics() {
-	try {
-		state.isAnalyticsEnabled = !state.isAnalyticsEnabled;
-		await chrome.storage.local.set({
-			analyticsEnabled: state.isAnalyticsEnabled,
-		});
-		updateAnalyticsButton();
-		const menuAnalyticsBtn = document.getElementById("analyticsBtn");
-		if (menuAnalyticsBtn) {
-			menuAnalyticsBtn.textContent = `${
-				state.isAnalyticsEnabled ? "Disable" : "Enable"
-			} Analytics`;
-		}
-		showNotification(
-			`Analytics ${state.isAnalyticsEnabled ? "enabled" : "disabled"}!`,
-			"success",
-		);
-	} catch (error) {
-		showNotification("Error updating analytics settings", "error");
-	}
+	state.isAnalyticsEnabled = !state.isAnalyticsEnabled;
+	await chrome.storage.local.set({
+		analyticsEnabled: state.isAnalyticsEnabled,
+	});
+	updateAnalyticsButton();
+	showNotification(
+		`Analytics ${state.isAnalyticsEnabled ? "enabled" : "disabled"}!`,
+		"success",
+	);
 }
 
-function updateNepseUI() {
+function createChartCanvas() {
+	if (!elements.chartCanvas) return;
+
+	if (!chartInstance) {
+		chartInstance = new Chart(elements.chartCanvas, state.currentIndexChart);
+	} else {
+		chartInstance.updateData(state.currentIndexChart);
+	}
+	chartInstance.render();
+}
+
+export function updateNepseUI() {
 	if (!state.nepseData) return;
 
-	if (scheduledFrame) {
-		cancelAnimationFrame(scheduledFrame);
-	}
+	if (scheduledFrame) cancelAnimationFrame(scheduledFrame);
 
 	scheduledFrame = requestAnimationFrame(() => {
+		createChartCanvas();
+
 		const {
-			time,
-			open,
-			high,
-			low,
-			close,
-			change,
-			turnover,
-			totalTradedShared,
-			totalTransactions,
-			totalScripsTraded,
-			previousClose,
-			percentageChange,
-		} = state.nepseData;
+			time = Date.now(),
+			open = null,
+			high = null,
+			low = null,
+			close = null,
+			change = 0,
+			turnover = null,
+			totalTradedShared = null,
+			totalTransactions = null,
+			totalScripsTraded = null,
+			previousClose = null,
+			percentageChange = 0,
+		} = state.currentIndex;
 
 		const isPositive = change >= 0;
 		const newChange = isPositive ? "positive" : "negative";
@@ -192,18 +227,13 @@ function updateNepseUI() {
 
 		// Update chart container colors
 		if (elements.chartContainer) {
-			const hasNewClass = elements.chartContainer.classList.contains(newChange);
-			if (!hasNewClass) {
+			if (!elements.chartContainer.classList.contains(newChange)) {
 				elements.chartContainer.classList.remove("positive", "negative");
 				elements.chartContainer.classList.add(newChange);
 
 				// Only recreate chart if classes changed
-				if (elements.chartCanvas) {
-					chartInstance = new Chart(
-						elements.chartCanvas,
-						state.nepseIndexChart,
-					);
-					chartInstance.render();
+				if (elements.chartCanvas && chartInstance) {
+					chartInstance.updateStyle();
 				}
 			}
 		}
@@ -215,18 +245,20 @@ function updateNepseUI() {
 		}
 
 		if (elements.changeIndicator) {
-			const hasNewClass =
-				elements.changeIndicator.classList.contains(newChange);
-			if (!hasNewClass) {
-				elements.changeIndicator.classList.remove("positive", "negative");
-				elements.changeIndicator.classList.add(newChange);
-			}
+			elements.changeIndicator.classList.remove(
+				"positive",
+				"negative",
+				"open",
+				"close",
+			);
+			elements.changeIndicator.classList.add(
+				newChange,
+				state.isOpen.toLowerCase(),
+			);
 		}
 
 		if (elements.time) {
-			const date = new Date(time ?? Date.now());
-			//why? sometimes nepse api returns time as null
-			elements.time.textContent = date.toLocaleString();
+			elements.time.textContent = time.toLocaleString();
 		}
 
 		if (elements.open) {
@@ -234,11 +266,11 @@ function updateNepseUI() {
 		}
 
 		if (elements.high) {
-			elements.high.textContent = high;
+			elements.high.textContent = high ?? "-";
 		}
 
 		if (elements.low) {
-			elements.low.textContent = low;
+			elements.low.textContent = low ?? "-";
 		}
 
 		if (elements.close) {
@@ -250,96 +282,112 @@ function updateNepseUI() {
 		}
 
 		if (elements.shareTraded) {
-			elements.shareTraded.textContent = totalTradedShared;
+			elements.shareTraded.textContent = totalTradedShared ?? "-";
 		}
 
 		if (elements.transaction) {
-			elements.transaction.textContent = totalTransactions;
+			elements.transaction.textContent = totalTransactions ?? "-";
 		}
 
 		if (elements.scriptTraded) {
-			elements.scriptTraded.textContent = totalScripsTraded;
+			elements.scriptTraded.textContent = totalScripsTraded ?? "-";
 		}
 
 		if (elements.pClose) {
-			elements.pClose.textContent = previousClose;
+			elements.pClose.textContent = previousClose ?? "-";
 		}
 	});
 }
 
-function updateNepseToggleUI() {
-	const btn = elements.nepseToggle;
-	const nepseTab = document.querySelector('[data-tab="nepse"]');
-	const tmsTab = document.querySelector('[data-tab="tms"]');
-	const nepseContent = document.querySelector("#nepseTab");
-	const tmsContent = document.querySelector("#tmsContent");
+export function updateNepseToggleUI() {
+	elements.nepseToggle.textContent = state.isNepseEnabled
+		? "Disable Update"
+		: "Enable Update";
+	elements.nepseToggle.classList.toggle("active", state.isNepseEnabled);
 
-	btn.textContent = state.isNepseEnabled ? "Disable Update" : "Enable Update";
-	btn.classList.toggle("active", state.isNepseEnabled);
-
-	if (nepseTab) {
-		(nepseTab as HTMLElement).style.display = state.isNepseEnabled
+	if (elements.nepseDataTab)
+		elements.nepseDataTab.style.display = state.isNepseEnabled
 			? "block"
 			: "none";
-	}
 
 	if (!state.isNepseEnabled) {
-		if (nepseContent) {
-			(nepseContent as HTMLElement).style.display = "none";
+		if (elements.nepseQuery) {
+			elements.nepseQuery.style.display = "none";
 		}
 
-		if (nepseTab?.classList.contains("active")) {
-			nepseTab.classList.remove("active");
-			tmsTab?.classList.add("active");
-			if (tmsContent) {
-				(tmsContent as HTMLElement).style.display = "block";
+		if (elements.nepseDataTab?.classList.contains("active")) {
+			elements.nepseDataTab.classList.remove("active");
+			elements.tmsDataTab?.classList.add("active");
+			if (elements.tmsQuery) {
+				elements.tmsQuery.style.display = "block";
 			}
 		}
 		state.activeTab = "tms";
 	}
 }
 
-async function loadNepseState(): Promise<void> {
+export async function loadNepseState(): Promise<void> {
 	try {
-		const storage = await chrome.storage.local.get([
-			"isNepseEnabled",
-			"nepseData",
-			"isNepseOpen",
-			"nepseChartData",
+		const isEnabled = await chrome.storage.local.get([
+			STORAGE_KEYS.NEPSE_ENABLED,
 		]);
 
-		state.isNepseEnabled = storage.isNepseEnabled ?? state.isNepseEnabled;
+		state.isNepseEnabled = isEnabled.isNepseEnabled ?? state.isNepseEnabled;
 		updateNepseToggleUI();
 
 		if (!state.isNepseEnabled) return;
 
+		const storage = await chrome.storage.local.get([
+			STORAGE_KEYS.NEPSE_DATA,
+			STORAGE_KEYS.NEPSE_STATE,
+			STORAGE_KEYS.NEPSE_CHART_DATA,
+			STORAGE_KEYS.ACTIVE_DASHBOARD,
+			STORAGE_KEYS.OTHER_DASHBOARD,
+		]);
+
+		if (storage.activeDashboard) {
+			state.activeDashboard = storage.activeDashboard as IndexKey;
+		}
+
+		if (storage.otherDashboard) {
+			const otherStorage = await chrome.storage.local.get([
+				STORAGE_KEYS.OTHER_INDEXES,
+				STORAGE_KEYS.OTHER_INTRADAY_CHART,
+			]);
+
+			if (otherStorage.otherIndexes)
+				state.otherIndexData = otherStorage.otherIndexes as OtherIndexDataMap;
+
+			if (otherStorage.otherIntradayChart)
+				state.otherIntradayChart =
+					otherStorage.otherIntradayChart as OtherChartDataArray;
+		}
+
+		//validate data and load default if not present
 		if (
 			!storage.nepseData ||
 			storage.isNepseOpen === undefined ||
 			!storage.nepseChartData ||
 			storage.nepseChartData.length === 0
 		) {
-			const [defaultData, nepseOpen, indexChartData] = await Promise.all([
-				loadDefaultNepseData(),
-				loadNepseOpen(),
-				loadDefaultNepseIndexData(),
-			]);
+			const [[nepseData, indexDataMap], nepseOpen, indexChartData] =
+				await Promise.all([
+					loadDefaultNepseData(),
+					loadNepseOpen(),
+					loadDefaultNepseIndexData(),
+				]);
 
 			state.isOpen = nepseOpen;
-			state.nepseData = defaultData;
-			state.nepseIndexChart = indexChartData;
+			state.nepseData = nepseData;
+			state.dashboardIndexChart = indexChartData;
+			state.otherIndexData = indexDataMap;
 		} else {
 			state.isOpen = storage.isNepseOpen;
 			state.nepseData = storage.nepseData;
-			state.nepseIndexChart = storage.nepseChartData;
+			state.dashboardIndexChart = storage.nepseChartData;
 		}
 
 		updateNepseUI();
-
-		if (elements.chartCanvas) {
-			chartInstance = new Chart(elements.chartCanvas, state.nepseIndexChart);
-			chartInstance.render();
-		}
 	} catch (error) {
 		console.error("Error loading NEPSE data:", error);
 	}
@@ -373,10 +421,8 @@ function setupMenu() {
 	const menuContent = document.getElementById("menuContent");
 	const backupBtn = document.getElementById("backupBtn");
 	const restoreBtn = document.getElementById("restoreBtn");
-	const analyticsBtn = document.getElementById("analyticsBtn");
 	const privacyBtn = document.getElementById("privacyBtn");
 	const termsBtn = document.getElementById("termsBtn");
-	const nepseBtn = document.getElementById("nepseBtn");
 
 	if (!menuBtn || !menuContent) return;
 
@@ -399,12 +445,12 @@ function setupMenu() {
 		menuContent?.classList.add("hidden");
 	});
 
-	nepseBtn?.addEventListener("click", () => {
+	elements.nepseToggle?.addEventListener("click", () => {
 		toggleNepseUpdates();
 		menuContent?.classList.add("hidden");
 	});
 
-	analyticsBtn?.addEventListener("click", () => {
+	elements.analyticsBtn?.addEventListener("click", () => {
 		toggleAnalytics();
 		menuContent?.classList.add("hidden");
 	});
@@ -425,27 +471,11 @@ function setupMenu() {
 }
 
 async function loadAnalyticsState() {
-	const { analyticsEnabled } =
-		await chrome.storage.local.get("analyticsEnabled");
+	const { analyticsEnabled } = await chrome.storage.local.get(
+		STORAGE_KEYS.ANALYTICS_ENABLED,
+	);
 	state.isAnalyticsEnabled = analyticsEnabled !== false;
 	updateAnalyticsButton();
-}
-
-function addMenuToHeader() {
-	const header = document.querySelector(".header") as HTMLElement;
-	const menuHtml = `
-    <div class="menu-dropdown">
-      <div id="menuContent" class="menu-content hidden">
-         <button id="nepseBtn">${
-						state.isNepseEnabled ? "Disable" : "Enable"
-					} Nepse Updates</button>
-        <button id="analyticsBtn">
-          ${state.isAnalyticsEnabled ? "Disable" : "Enable"} Analytics
-        </button>
-      </div>
-    </div>
-  `;
-	header.insertAdjacentHTML("beforeend", menuHtml);
 }
 
 function resetForm() {
@@ -476,23 +506,37 @@ function createAccountActions(account: Account): HTMLDivElement {
 	const actions = document.createElement("div");
 	actions.className = "account-actions";
 
-	const editButton = document.createElement("button");
-	editButton.className = "btn-action";
-	editButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-  </svg>`;
-	editButton.addEventListener("click", () => handleEditAccount(account));
+	const fragment = document.createDocumentFragment();
 
-	const deleteButton = document.createElement("button");
-	deleteButton.className = "btn-action delete-action";
-	deleteButton.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-  </svg>`;
-	deleteButton.addEventListener("click", () => handleDeleteAccount(account));
+	const buttonConfigs = [
+		{
+			className: "edit-action",
+			icon: SVG_ICONS.edit,
+			handler: () => handleEditAccount(account),
+		},
+		{
+			className: "primary-action",
+			icon: account.isPrimary
+				? SVG_ICONS.primaryFilled
+				: SVG_ICONS.primaryOutline,
+			handler: async () => makePrimary(account),
+		},
+		{
+			className: "delete-action",
+			icon: SVG_ICONS.delete,
+			handler: () => handleDeleteAccount(account),
+		},
+	];
 
-	actions.appendChild(editButton);
-	actions.appendChild(deleteButton);
+	for (const { className, icon, handler } of buttonConfigs) {
+		const button = document.createElement("button");
+		button.className = `btn-action ${className}`;
+		button.innerHTML = icon;
+		button.addEventListener("click", handler);
+		fragment.appendChild(button);
+	}
 
+	actions.appendChild(fragment);
 	return actions;
 }
 
@@ -549,62 +593,35 @@ async function handleDeleteAccount(account: Account) {
 	}
 }
 
-// Backup and Restore functionality
-function backupAccounts() {
-	const backup = {
-		accounts: state.accounts,
-		timestamp: new Date().toISOString(),
-	};
+async function makePrimary(account: Account) {
+	if (account.type === "meroshare") {
+		state.accounts = state.accounts.map((acc) => ({
+			...acc,
+			isPrimary:
+				acc.type === "meroshare" ? acc.alias === account.alias : acc.isPrimary,
+		}));
 
-	const blob = new Blob([JSON.stringify(backup, null, 2)], {
-		type: "application/json",
-	});
-	const url = URL.createObjectURL(blob);
+		ensureSingleMerosharePrimary();
+	} else if (account.type === "tms") {
+		state.accounts = state.accounts.map((acc) => ({
+			...acc,
+			isPrimary:
+				acc.type === "tms" && acc.broker === account.broker
+					? acc.alias === account.alias
+					: acc.isPrimary,
+		}));
 
-	const a = document.createElement("a");
-	a.href = url;
-	a.download = `nepse-companion-backup-${
-		new Date().toISOString().split("T")[0]
-	}.json`;
-	document.body.appendChild(a);
-	a.click();
-	document.body.removeChild(a);
-	URL.revokeObjectURL(url);
+		ensureTMSPrimaryPerBroker();
+	}
+
+	await saveAccounts();
+	renderAccountsList();
+	showNotification("Primary account updated successfully!", "success");
 }
 
-async function restoreAccounts() {
-	const input = document.createElement("input");
-	input.type = "file";
-	input.accept = ".json";
-
-	input.onchange = async (e) => {
-		const file = (e.target as HTMLInputElement).files?.[0];
-		if (!file) return;
-
-		try {
-			const content = await file.text();
-			const backup = JSON.parse(content);
-
-			if (!backup.accounts || !Array.isArray(backup.accounts)) {
-				throw new Error("Invalid backup file format");
-			}
-
-			state.accounts = backup.accounts;
-			await saveAccounts();
-			renderAccountsList();
-			showNotification("Accounts restored successfully!", "success");
-		} catch (error) {
-			showNotification(`Error restoring backup: ${error}`, "error");
-		}
-	};
-
-	input.click();
-}
-
-function updateAnalyticsButton() {
-	const analyticsBtn = elements.analyticsBtn;
-	if (analyticsBtn) {
-		analyticsBtn.textContent = `${
+export function updateAnalyticsButton() {
+	if (elements.analyticsBtn) {
+		elements.analyticsBtn.textContent = `${
 			state.isAnalyticsEnabled ? "Disable" : "Enable"
 		} Analytics`;
 	}
@@ -613,7 +630,7 @@ function updateAnalyticsButton() {
 // Account Management
 async function loadAccounts() {
 	try {
-		const result = await chrome.storage.local.get("accounts");
+		const result = await chrome.storage.local.get(STORAGE_KEYS.ACCOUNTS);
 		state.accounts = result.accounts || [];
 		ensureSingleMerosharePrimary();
 		ensureTMSPrimaryPerBroker();
@@ -777,11 +794,9 @@ function hideAddAccountForm() {
 
 // Account Operations
 async function addAccount(account: Account) {
-	if (account.type === "meroshare") {
-		handleMeroshareAccountAdd(account);
-	} else {
-		handleTMSAccountAdd(account);
-	}
+	account.type === "meroshare"
+		? handleMeroshareAccountAdd(account)
+		: handleTMSAccountAdd(account);
 
 	state.accounts.push(account);
 	await saveAccounts();
@@ -899,7 +914,7 @@ function handleTMSAccountUpdate(updatedAccount: Account, oldAccount: Account) {
 }
 
 // UI Rendering
-function renderAccountsList() {
+export function renderAccountsList() {
 	elements.accountsList.innerHTML = "";
 	elements.meroshareList.innerHTML = "";
 
@@ -982,24 +997,12 @@ function createAccountInfo(account: Account): HTMLDivElement {
 	return accountInfo;
 }
 
-// Utility Functions
-function showNotification(message: string, type: "success" | "error") {
-	if (!elements.notification) return;
-
-	elements.notification.textContent = message;
-	elements.notification.className = `notification ${type}`;
-	elements.notification.classList.remove("hidden");
-
-	setTimeout(() => {
-		elements.notification.classList.add("hidden");
-	}, 3000);
-}
-
-async function saveAccounts() {
+export async function saveAccounts() {
 	await chrome.storage.local.set({ accounts: state.accounts });
 }
 
 // Initialize on DOM load
-document.addEventListener("DOMContentLoaded", () => {
-	init();
+document.addEventListener("DOMContentLoaded", async () => {
+	await initThemeToggle();
+	await init();
 });
